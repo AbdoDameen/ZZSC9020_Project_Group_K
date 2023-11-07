@@ -1,0 +1,9 @@
+# Group Meeting Recodings
+
+[2023-09-10 Meeting with Wei Tian](https://unsw-my.sharepoint.com/:v:/r/personal/z3071030_ad_unsw_edu_au/Documents/ZZSC9020/meetings/recordings/ZZSC9020_Project_Group_K-20230910_180736-Meeting_Recording.mp4?csf=1&web=1&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0RpcmVjdCJ9fQ&e=39s6XS)
+
+[2023-09-16 Discuss implementation plan](https://unsw-my.sharepoint.com/:v:/g/personal/z3071030_ad_unsw_edu_au/EVWceK8eJ8NBkAAFQWBKD9IBxjxHYsMiTLALtGMNuq4cjQ?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0RpcmVjdCJ9fQ&e=GSmQhF) 
+
+[2023-09-19 Meeting with Wei Tian](https://unsw-my.sharepoint.com/:v:/g/personal/z3071030_ad_unsw_edu_au/EWZg8ga3zhZJlqtrhz6gZ_kB1DO4dgP1-KOkIcXKTbUe8g?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0RpcmVjdCJ9fQ&e=LFj64u)
+
+[2023-09-19 Follow up after meeting with Wei Tian](https://unsw-my.sharepoint.com/:v:/g/personal/z3071030_ad_unsw_edu_au/EcRD02skBdVFpJ6nR9vuv4MB2HsdXCz3t_wAwQ9f0flI2A?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0RpcmVjdCJ9fQ&e=ASqlBA)
