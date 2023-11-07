@@ -1,0 +1,490 @@
+---
+title: "Impact of Climate Change on Electricity Consumption in New South Wales"
+team: Group K
+session: Hexamester 5, 2023
+coursecode: ZZSC9020
+author: 
+  - "Abdelrhman Dameen (z5427841), "
+  - "Md Nezam Uddin (z5339862), "
+  - "Pam Moodley (z5366156), "
+  - "Van Hai Ho (z3071030)"
+date: "01/10/2023"
+Acknowledgements: 
+  - "By far the greatest thanks must go to our lecturers for the guidance, care and support they provided."
+Abstract: 
+  - "Climate Change has had significant impacts on our everyday life around the world. Energy consumption is essential in modern life, required by individual family units to large organizations and industrial scales. In this project, we investigate a strategy for integrative demand forecasting for energy consumption using a machine learning approach with seasonal decomposition and climate change impact analysis."
+  - "Knowledge gaps ...."
+  - "How we can fill in the knowledge gaps ...."
+  - "Result with key and concrete values ...."
+  - "Meaning of the results ...."
+output:
+  pdf_document:
+    template: template.tex
+    md_extensions: +raw_attribute
+    keep_md: true 
+    keep_tex: true 
+    pandoc_args:
+    - --top-level-division="chapter"
+    - --bibliography="references.bib"
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: yes
+  word_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+bibliography: references.bib
+csl: university-of-south-wales-harvard.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Sys.setenv(RETICULATE_PYTHON = "C:\\Apps\\Python311\\python.exe")
+# RETICULATE_PYTHON="C:\\Apps\\Python311\\python.exe"
+library(reticulate)
+if (.Platform$OS.type == "unix") {
+ use_python("/usr/bin/python")
+} else if (.Platform$OS.type == "windows") {
+  # use_python("C:\\Apps\\Python311\\python.exe")
+}
+# use_python("C:/Apps/Python311/python.exe")
+
+matplotlib <- import("matplotlib")
+matplotlib$use("Agg", force = TRUE)
+```
+
+
+```{python, echo = FALSE}
+import numpy as np
+import pandas as pd
+```
+
+# Introduction {.label:s-intro}
+
+The supply and demand of energy are volatile. For suppliers to enter and remain in the market, the supply of energy must be profitable. Profitability hinges on accurately predicting and providing the most efficient amount of energy to the grid.
+
+It is a known fact that weather plays a significant role in energy demand. For instance, heating is utilized when the temperature drops, and air conditioning is used when the temperature rises. Therefore, this analysis will examine the impact of weather on energy demand to better predict the required supply. If the supply is not accurately calculated, suppliers may incur excessive costs to provide additional energy. Given the substantial role of weather in energy demand, the analysis will also consider the effects of global warming and erratic storm periods.
+
+Other factors also influence the supply and demand of energy. This project will attempt to identify the patterns that daily and seasonal variations, as well as holidays, have on demand.
+
+Incorporating all these factors into an analysis of energy demand will highlight the advantages of using a machine learning model to predict demand more efficiently.
+
+Specifically, within the scope of this project, we will identify energy consumption patterns to uncover hidden temporal trends in demand, including daily and seasonal fluctuations. We will perform a climate impact assessment to quantify how changes in climate variables, like temperature, affect energy demand.
+
+Additionally, we will conduct holiday and special event analysis to understand their impact on energy consumption, thereby aiding in better planning.
+
+Based on this analysis, we will provide policy recommendations to offer actionable insights for energy policy formulation, including the diversification of energy sources to balance demand. We will create a machine learning model capable of predicting future energy demand with high accuracy, incorporating all the identified variables.
+
+
+# Literature Review
+The topic of how climate change impacts residential energy use has been studied in various global contexts. The first research paper investigates the potential changes in energy consumption in Europe and Australia, predicting a variable impact ranging from a 26% decrease to a whopping 350% increase by the year 2100. @Yazdan-et-al-2022-FC. Particularly, homes in Sydney have been identified as more susceptible to climate change, emphasizing the importance of geographical factors. Another study shifts the focus to Asia, particularly to five major cities in China. This research expects an increase in cooling energy demands while foreseeing a decrease in heating requirements @Fard-Hosseini-2022-ML. These trends align with the general narrative that global warming is driving cooling needs upwards. Finally, a third study zeroes in on Brazil, forecasting an upsurge in energy demands by up to 185% by 2080. However, the paper also proposes that passive design techniques could significantly mitigate these energy demands, potentially reducing annual consumption by up to 50% @Invidiata-Ghisi-2016-CC.
+
+Collectively, these studies underline that climate change will have a substantial impact on residential and office energy demands worldwide. They stress the significance of local geographical and climatic conditions and propose passive design as a key strategy for mitigating future energy needs.
+
+# Material and Methods
+
+## Software
+
+Python and R/RSudio software will be used to analyse the data. Libraries and packages such as pandas, matplotlib, seaborn for Python and ggplot2, dplyr, caret for R are required in this analysis. RMarkdown, knitr will also be utilized for putting the analysis together.
+
+## Description of the Data
+
+We will use the provided data sets as our core data for our analysis, including:
+
+* *totaldemand_nsw.csv*: Total Demand data.
+
+* *temperature_nsw.csv*: Temperature data.
+
+The data will need further analysis and cleaning, including the removal of invalid and outlier data before they will be used to generate the demand forecast.
+
+### Total Demand data
+
+The Total Demand data provided in file *totaldemand_nsw.csv* contains energy demand in 5-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is in a comma-delimited file format, with columns labeled Datetime, RegionId, and TotalDemand. The RegionId consists only of NSW1.
+
+```{python}
+# Read Total Demand data from file
+demand_df = pd.read_csv('../../data/totaldemand_nsw.csv')
+
+# Number of records in Total Demand data set
+demand_df.count()
+
+# Snippet of Total Demand data
+demand_df.head(10)
+```
+
+### Temperature data
+
+The temperature data provided in file *temperature_nsw.csv* is in 30-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is provided in a comma-delimited file format, with headings DateTime, Location, and Temperature (in Celsius). The source of the temperature data is the Bankstown weather location. Invalid temperatures, such as -9999, will be removed from the analysis.
+
+```{python}
+# Read Temperature data from file
+temp_df = pd.read_csv('../../data/temperature_nsw.csv')
+
+# Number of records in Temperature data file
+temp_df.count()
+
+# Snippet of Temperature data
+temp_df.head(10)
+
+```
+
+### Other data sets
+
+We will use additional data sets to encrich the provided data to enhance the accuracy of demand forecast.
+
+When merging these datasets, there will be mismatched data since the demand is in 5-minute intervals and the temperature data is in 30-minute intervals. There are approximately 1.3 million rows of demand data and 247,646 rows of temperature data; therefore, some analysis is required to map more demand data to temperature data. One possibility is to simulate temperature data for the data points that are not available.
+
+Since this project aims to address questions regarding future energy demand, historical data will be utilized, and the datasets provided are an excellent starting point. Additional data will be sourced to enhance these datasets.
+
+
+## Pre-processing Steps
+
+The data type on the columns which contain the date time are not date time, therefore the column needs to be cast to datetime for better analysis 
+
+```{python}
+demand_df.dtypes
+demand_df[['DATETIME']] = demand_df[['DATETIME']].apply(pd.to_datetime)
+demand_df.dtypes
+temp_df[['DATETIME']] = temp_df[['DATETIME']].apply(pd.to_datetime)
+temp_df.dtypes
+
+demand_df.describe()
+temp_df.describe()
+```
+
+## Data Cleaning
+*Comments from template:How did you deal with missing data? etc. *
+
+There are temperatures which have a value of -9999. Pull this data out to investigate.
+
+```{python}
+## check values which are less than 0
+temp_Less0= temp_df[temp_df['TEMPERATURE'] < 0]
+temp_Less0.describe()
+temp_Less0
+
+## only leave rows where temp > -9999 which will exclude data which is -9999
+temp_df= temp_df[temp_df['TEMPERATURE'] > -9999]
+temp_df.describe()
+
+```
+
+
+
+## Assumptions
+
+*Comments from template:What assumptions are you making on the data?*
+
+## Modelling Methods
+
+# Exploratory Data Analysis
+```{python}
+merged_df = pd.merge(demand_df, temp_df, on='DATETIME', how='inner')
+
+merged_df.head(5)
+
+merged_df.info()
+merged_df.describe()
+```
+
+*Comments from template:This is where you explore your data using histograms, scatterplots, boxplots, numerical summaries, etc.*
+
+Tried scatter plot and linear model plot
+It is clear that the linear plot is not the best model to utilise.
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+
+sns.lmplot(y="TOTALDEMAND", x="TEMPERATURE", data=merged_df, order=1)
+plt.xlabel('Temp')
+plt.ylabel('Demand')
+plt.show()
+
+
+plt.scatter(y=merged_df['TOTALDEMAND'], x=merged_df['TEMPERATURE'])
+plt.show()
+```
+
+# Demand Forecasting - from Abdo
+
+## Import Required Libraries
+
+```{python}
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import xgboost as xgb
+from sklearn.metrics import mean_squared_error
+
+from datetime import datetime
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+```
+
+## Prepare Data
+
+```{python}
+# Override the default linewidth and markersize
+plt.rcParams['lines.linewidth'] = 1
+plt.rcParams['lines.markersize'] = 5
+
+color_pal = sns.color_palette()
+plt.style.use('fivethirtyeight')
+
+# Load the total energy demand data for NSW
+# total_demand_path = ('/content/totaldemand_nsw.csv')
+total_demand_path = ('../../data/totaldemand_nsw.csv')
+total_demand_df = pd.read_csv(total_demand_path)
+total_demand_df
+
+# Make a copy of original data
+orignal_df = total_demand_df.copy()
+total_demand_df.head(10)
+
+```
+
+
+Set index for Date/Time:
+
+```{python}
+total_demand_df = total_demand_df.set_index('DATETIME')
+total_demand_df.index = pd.to_datetime(total_demand_df.index)
+
+all_day_df = total_demand_df.copy()
+
+total_demand_df.describe()
+
+```
+
+
+
+
+
+## Plot Total Demand
+
+
+
+# Demand Forecasting - from Nezam
+
+## Import Required Libraries
+
+```{python}
+import os 
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+import plotly.express as px 
+
+from sklearn.linear_model import LinearRegression
+from sklearn.neural_network import MLPRegressor
+import lightgbm as lgb
+from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import GridSearchCV
+
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+from window_ops.rolling import rolling_mean, rolling_max, rolling_min
+
+import warnings
+warnings.filterwarnings("ignore")
+
+```
+
+
+## Data Wrangling
+
+```{python}
+#tot_demand = pd.read_csv('/Users/nizam/Desktop/data/totaldemand_nsw.csv')
+tot_demand = pd.read_csv('../../data/totaldemand_nsw.csv')
+
+#tot_demand.dtypes # DATETIME is object
+# convert to a datetime object
+tot_demand['DATETIME'] = pd.to_datetime(tot_demand['DATETIME'])
+
+# Check for duplicate DATETIME
+duplicate_rows = tot_demand[tot_demand.duplicated(keep=False)] # keep=False to see all the duplicates
+
+# drop duplicated rows
+tot_demand = tot_demand.drop_duplicates()
+
+# Set DATETIME feature as index
+tot_demand_copy = tot_demand.copy()
+tot_demand_idx=tot_demand_copy.set_index('DATETIME')
+print(tot_demand_idx)
+
+```
+
+
+## Create some functions
+
+```{python}
+# root mean squared error (rsme)
+def rmse(pred, actual): 
+	return np.sqrt(((pred-actual)**2).mean())
+
+# mean absolute percentage error (mape)
+def mape(actual, pred):
+    return np.mean(np.abs((actual - pred) / actual)) * 100
+
+# Create time series features based on time series index
+def create_features(df):
+    df['YEAR'] = df.index.year
+    df['MONTH'] = df.index.month
+    df['DAY_OF_WEEK'] = df.index.dayofweek
+    df['DAY'] = df.index.day
+    df['HOUR'] = df.index.hour
+    df['HALF_HOUR'] = df.index.minute//30
+    
+    return df
+
+```
+
+
+## Exploratory Data Analysis for energy "totaldemand" data
+
+We plot demand against datetime to observe the pattern of energy demand.
+
+```{python}
+fig = px.line(tot_demand, x="DATETIME", y="TOTALDEMAND", title="Energy Demand with slider", height=600) # width
+fig.update_xaxes(
+    rangeslider_visible=True,
+    rangeselector=dict(
+        buttons=list([
+            dict(count=1, label="1y", step="year", stepmode="todate"),
+            dict(count=2, label="2y", step="year", stepmode="todate"),
+            dict(count=3, label="3y", step="year", stepmode="todate"),
+            dict(step="all")
+        ])
+    )
+)
+fig.show()
+
+```
+
+## Auto correlation
+
+```{python}
+# using lag_plot
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=1) # 1lag = 5 mints
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12) # lag12 = 5*12= 60 mints =1hr
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12*24) # lag12*24 = 5*12*24= 1day
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12*24*365) # 1year
+
+# Using auto correlation
+pd.plotting.autocorrelation_plot(tot_demand_idx["2010":"2022"]["TOTALDEMAND"].resample("1m").mean())
+
+```
+
+## Visualise Features and Target Relationship
+
+
+## Using R {.fragile}
+
+**This is from Template**
+
+```{r}
+boxplot(cars, col = c("#5975a4", "#cc8963"))
+```
+
+## Using Python {.fragile}
+
+See https://cran.r-project.org/web/packages/reticulate/vignettes/r_markdown.html for more details.
+
+\bigskip
+
+You need to install the R package `reticulate`.
+
+```{python eval = !is.null(reticulate:::py_discover_config())}
+print("Python can be used with MATHxxxx!")
+import sys
+print(sys.version)
+```
+
+
+```{python}
+import numpy as np
+np.random.seed(1)
+np.random.normal(0.0, 1.0, size=10)
+```
+
+```{python, engine.path = py_discover_config()$pythonhome}
+import pandas as pd
+import matplotlib.pyplot as plt
+df=pd.DataFrame([[1, 2], [3, 4], [4, 3], [2, 3]])
+fig = plt.figure(figsize=(4, 4))
+for i in df.columns:
+    ax=plt.subplot(2,1,i+1) 
+    df[[i]].plot(ax=ax)
+    print(i)
+
+plt.show()
+```
+
+
+# Analysis and Results
+
+## A First Model
+
+Having a very simple model is always good so that you can benchmark any result you would obtain with a more elaborate model.
+
+\bigskip
+
+For example, one can use the linear regression model
+
+$$
+Y_i = \beta_0 + \beta_1 x_{1i} + \cdots \beta_p x_{pi} + \epsilon_i, \qquad i=1,\ldots,n.
+$$
+where it is assumed that the $\epsilon_i$'s are i.i.d.\ $N(0,1)$.
+
+# Discussion
+
+Put the results you got in the previous chapter in perspective with respect to the problem studied.
+
+# Conclusion and Further Issues {.label:ccl}
+
+What are the main conclusions? What are your recommendations for the "client"? What further analysis could be done in the future?
+
+A figure:
+
+![A caption \label{myfigure}](unsw-logo.png){width="6cm" height="2cm"}
+
+In the text, see Figure \ref{myfigure}.
+
+
+# References {-}
+
+<div id="refs"></div>
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+# Appendix {-}
+
+## **Codes** {-}
+
+Add you codes here.
+
+## **Tables** {-}
+
+If you have tables, you can add them here.
+
+Use https://www.tablesgenerator.com/markdown_tables to crete very simple markdown tables, otherwise use \LaTeX.
+
+| Tables   |      Are      |  Cool |
+|----------|:-------------:|------:|
+| col 1 is |  left-aligned | $1600 |
+| col 2 is |    centered   |   $12 |
+| col 3 is | right-aligned |    $1 |
+
+
+

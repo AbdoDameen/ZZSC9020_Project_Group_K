@@ -1,0 +1,872 @@
+---
+title: "Impact of Climate Change on Electricity Consumption in New South Wales"
+team: Group K
+session: Hexamester 5, 2023
+coursecode: ZZSC9020
+author: 
+  - "Abdelrhman Dameen (z5427841), "
+  - "Md Nezam Uddin (z5339862), "
+  - "Pam Moodley (z5366156), "
+  - "Van Hai Ho (z3071030)"
+date: "01/10/2023"
+Acknowledgements: 
+  - "By far the greatest thanks must go to our lecturers for the guidance, care and support they provided."
+  - "Thank you everyone in Group K for an effective working group."
+Abstract: 
+  - "Climate Change has had significant impacts on our everyday life around the world. Energy consumption is essential in modern life, required by individual family units to large organizations and industrial scales. In this project, we investigate a strategy for integrative demand forecasting for energy consumption using a machine learning approach with seasonal decomposition and climate change impact analysis. ... Knowledge gaps .... How we can fill in the knowledge gaps .... Result with key and concrete values .... "
+  - "Meaning of the results ...."
+output:
+  pdf_document:
+    template: template.tex
+    md_extensions: +raw_attribute
+    keep_md: true 
+    keep_tex: true 
+    pandoc_args:
+    - --top-level-division="chapter"
+    - --bibliography="references.bib"
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: yes
+  word_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+bibliography: references.bib
+csl: university-of-south-wales-harvard.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Sys.setenv(RETICULATE_PYTHON = "C:\\Apps\\Python311\\python.exe")
+# RETICULATE_PYTHON="C:\\Apps\\Python311\\python.exe"
+library(reticulate)
+if (.Platform$OS.type == "unix") {
+ use_python("/usr/bin/python")
+} else if (.Platform$OS.type == "windows") {
+  # use_python("C:\\Apps\\Python311\\python.exe")
+}
+# use_python("C:/Apps/Python311/python.exe")
+
+matplotlib <- import("matplotlib")
+matplotlib$use("Agg", force = TRUE)
+```
+
+
+```{python import, echo = FALSE}
+import os 
+#from window_ops.rolling import rolling_mean, rolling_max, rolling_min
+import numpy as np
+import pandas as pd
+
+# Importing 'datetime' from Python standard library
+from datetime import datetime
+
+# Import plot libraries for plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Import sklearn libraries
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+
+# Import XGBoost
+import xgboost as xgb
+from xgboost import XGBRegressor
+
+# Import statsmodels for seasonal decomposition
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+import plotly.graph_objs as go
+import plotly.express as px 
+
+import lightgbm as lgb
+
+import warnings
+warnings.filterwarnings("ignore")
+
+```
+
+
+# Introduction {.label:s-intro}
+
+The supply and demand of energy are volatile. For suppliers to enter and remain in the market, the supply of energy must be profitable. Profitability hinges on accurately predicting and providing the most efficient amount of energy to the grid.
+
+It is a known fact that weather plays a significant role in energy demand. For instance, heating is utilized when the temperature drops, and air conditioning is used when the temperature rises. Therefore, this analysis will examine the impact of weather on energy demand to better predict the required supply. If the supply is not accurately calculated, suppliers may incur excessive costs to provide additional energy. Given the substantial role of weather in energy demand, the analysis will also consider the effects of global warming and erratic storm periods.
+
+Other factors also influence the supply and demand of energy. This project will attempt to identify the patterns that daily and seasonal variations, as well as holidays, have on demand.
+
+Incorporating all these factors into an analysis of energy demand will highlight the advantages of using a machine learning model to predict demand more efficiently.
+
+Specifically, within the scope of this project, we will identify energy consumption patterns to uncover hidden temporal trends in demand, including daily and seasonal fluctuations. We will perform a climate impact assessment to quantify how changes in climate variables, like temperature, affect energy demand.
+
+Additionally, we will conduct holiday and special event analysis to understand their impact on energy consumption, thereby aiding in better planning.
+
+We hypothesised that as population is growing, the demand for energy is also increasing. We will perform an analysis to understand if our hyphothesis is true, or if it is not true, what other factors might have influence the energy demand.
+
+Based on this analysis, we will provide policy recommendations to offer actionable insights for energy policy formulation, including the diversification of energy sources to balance demand. We will create a machine learning model capable of predicting future energy demand with high accuracy, incorporating all the identified variables.
+
+
+# Literature Review{.label:s-literature-review}
+
+The topic of how climate change impacts residential energy use has been studied in various global contexts. The first research paper investigates the potential changes in energy consumption in Europe and Australia, predicting a variable impact ranging from a 26% decrease to a whopping 350% increase by the year 2100. @Yazdan-et-al-2022-FC. Particularly, homes in Sydney have been identified as more susceptible to climate change, emphasizing the importance of geographical factors. Another study shifts the focus to Asia, particularly to five major cities in China. This research expects an increase in cooling energy demands while foreseeing a decrease in heating requirements @Fard-Hosseini-2022-ML. These trends align with the general narrative that global warming is driving cooling needs upwards. Finally, a third study zeroes in on Brazil, forecasting an upsurge in energy demands by up to 185% by 2080. However, the paper also proposes that passive design techniques could significantly mitigate these energy demands, potentially reducing annual consumption by up to 50% @Invidiata-Ghisi-2016-CC.
+
+Collectively, these studies underline that climate change will have a substantial impact on residential and office energy demands worldwide. They stress the significance of local geographical and climatic conditions and propose passive design as a key strategy for mitigating future energy needs.
+
+There are other factors which influence the demand for energy, and these are the price, cost of living, dense living, and household roof solar, just to name a few. Australia known for its aging population also contributes to smaller households which the aged are occupying **(add article)** and the advances in building standards **(add article)** the households are utilising less power. It has been reported recently that the household roof top solar in Australia was going to turn energy prices negative @aus-rooftop-solar.
+
+# Material and Methods
+
+## Software
+
+Python and R/RSudio software will be used to analyse the data. Libraries and packages such as pandas, matplotlib, seaborn for Python and ggplot2, dplyr, xgboost, caret for R are required in this analysis. RMarkdown, knitr will also be utilized for putting the analysis together.
+
+## Description of the Data
+
+We will use the provided data sets as our core data for our analysis, including:
+
+* *totaldemand_nsw.csv*: Total Demand data.
+
+* *temperature_nsw.csv*: Temperature data.
+
+The data will need further analysis and cleaning, including the removal of invalid and outlier data before they will be used to generate the demand forecast.
+
+### Total Demand data
+
+The Total Demand data provided in file *totaldemand_nsw.csv* contains energy demand in 5-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is in a comma-delimited file format, with columns labeled Datetime, RegionId, and TotalDemand. The RegionId consists only of NSW1.
+
+```{python total-demand}
+# Read Total Demand data from file
+total_demand_df = pd.read_csv('../../data/totaldemand_nsw.csv')
+
+# Number of records in Total Demand data set
+#demand_df.count()
+
+#Update the type for the datetime
+total_demand_df.dtypes
+total_demand_df[['DATETIME']] = total_demand_df[['DATETIME']].apply(pd.to_datetime)
+
+#Show the details of the temperature data set
+total_demand_df.describe()
+
+# Snippet of Total Demand data
+total_demand_df.head(4)
+```
+
+### Temperature data
+
+The temperature data provided in file *temperature_nsw.csv* is in 30-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is provided in a comma-delimited file format, with headings DateTime, Location, and Temperature (in Celsius). The source of the temperature data is the Bankstown weather location. Invalid temperatures, such as -9999, will be removed from the analysis.
+
+```{python temperature}
+# Read Temperature data from file
+temp_df = pd.read_csv('../../data/temperature_nsw.csv')
+
+# Number of records in Temperature data file
+#temp_df.count()
+
+#inspect the datatypes 
+temp_df.dtypes
+
+#set the Date time as a DateTime
+temp_df[['DATETIME']] = temp_df[['DATETIME']].apply(pd.to_datetime)
+
+#Show the details of the temperature data set
+temp_df.describe()
+
+# Snippet of Temperature data
+temp_df.head(4)
+
+```
+
+### NSW Public Holidays
+
+We would like to understand if public holidays would impact the energy demand and what is the pattern. NSW public holiday data is publicly available from NSW Government Industrial Relations website. 
+
+The data source was in different formats and each file only consisted of one year. Therefore the data was merged into one file. There are some duplicates in the source data because some dates had 2 holiday names, or 2 holidays where over-lapping each other, e.g. Easter Monday and Anzac Day, and New Years day had different descriptions.
+
+```{python nsw-public-holidays}
+
+# Define the file path for public holidays
+file_path_publicHolidays = "../../data/school-public_holidays/MergedData/PublicHolidays.csv"
+
+
+#Get public holidays
+#coltypes = {'Date': 'date', 'Holiday': 'string'}
+#read the file 
+# Read the CSV file into dataframe
+publicHolidays_df = pd.read_csv(file_path_publicHolidays)
+
+publicHolidays_df['Date'] = pd.to_datetime(publicHolidays_df['Date'])
+
+#find problems in data frame
+#problems(publicHolidays_df)
+# display all the data
+print(publicHolidays_df.head(4))
+
+# make the holiday name lowercase
+publicHolidays_df['Holiday'] = publicHolidays_df['Holiday'].str.lower()
+
+#remove duplicates
+publicHolidays_df = publicHolidays_df.drop_duplicates()
+# Check for duplicates with the date only
+duplicates = publicHolidays_df[publicHolidays_df.duplicated(subset=['Date'])]
+
+# Filter rows with specific dates
+print(publicHolidays_df[publicHolidays_df['Date'] == '2011-04-25'])
+print(publicHolidays_df[publicHolidays_df['Date'] == '2017-01-02'])
+
+# Delete the duplicate rows
+publicHolidays_df = publicHolidays_df[~((publicHolidays_df['Date'] == '2011-04-25') & (publicHolidays_df['Holiday'] == 'easter monday'))]
+publicHolidays_df = publicHolidays_df[~((publicHolidays_df['Date'] == '2017-01-02') & (publicHolidays_df['Holiday'] == "new year's day holiday"))]
+```
+
+### Aggregated Price and Demand Data
+
+Energy price is also another factor affecting the energy demand. We use the aggregated price and demand data publicly available at Australian Energy Market Operator website (@aemo-aggregated-price-demand).
+
+Aggregated Price and Demand data is available by month from 1998 to current month. For the purpose of this project, we need 156 data files for the months from 2010 to 2022 in order to integrate with total demand and temperature data sets. These data files are merged into a single file in the same format with the following headers:
+
+- REGION: NSW Region.
+- SETTLEMENTDATE: Settlement date and time for every 5 minutes.
+- TOTALDEMAND: Total demand at the settlement date and time.
+- RRP: Retail Price.
+- PERIODTYPE: Period Type.
+
+From this data set, only the settlement date and RRP was utilised.
+
+### Population Data
+
+We hypothesised that as population is growing, the demand for energy is also increasing. We will perform an analysis to understand if our hyphothesis is true; or if it is not true, what other factors might have influence the energy demand. Population data that we use is publicly available at ..... This data is used in our analysis and is available in our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/blob/main/data/NSW%20estimated%20population.xlsx.
+
+
+### Other data sets
+
+Other datasets, e.g. School holidays, Crude oil prices, xxx where found.  These were not utilised since they either did not add value or could not be mapped to the current dataset. 
+
+### Data set format
+
+We need to integrate all data sets as discussed above. When merging these data sets, there will be mismatched frequency since the demand is in 5-minute intervals and the temperature data is in 30-minute intervals. There are approximately 1.3 million rows of demand data and 247,646 rows of temperature data. When merging the temperature and demand data, the demand data is grouped by 30 minutes and the mean is utilised, and merged with the temperature intervals.
+
+Since this project aims to address questions regarding future energy demand, historical data will be utilized, and the data sets provided are an excellent starting point. Additional data will be sourced to enhance these data sets.
+
+As we hypothesised that the energy demand would increase when the population is increasing, We also use population data from ABS to prove our hypothesis. The population data used in this project is available from our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/tree/main/data.
+
+Additional factors that could influence the demand is the energy price. We use data from AEC which provides the average price on demand hourly to identify the correlations. The aggregated price and demand data used in this project is also available from our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/tree/main/data/Aggregated%20price%20and%20demand%20data.
+
+## Pre-processing Steps
+
+The data type on the columns which contain the date time are not date time, therefore the column have been cast to datetime for better analysis.
+
+## Data Cleansing
+*Comments from template:How did you deal with missing data? etc.*
+
+There are temperatures which have a value of -9999. Pull this data out to investigate.  Duplicate rows where found and removed.
+
+```{python data-cleansing}
+## check values which are less than 0
+temp_Less0 = temp_df[temp_df['TEMPERATURE'] < 0]
+temp_Less0.describe()
+
+## only leave rows where temp > -9999 which will exclude data which is -9999
+temp_df= temp_df[temp_df['TEMPERATURE'] > -9999]
+temp_df.describe()
+
+# Check for duplicate DATETIME, keep = False to see all the duplicates
+duplicate_rows = total_demand_df[total_demand_df.duplicated(keep = False)]
+
+# Identify missing values
+missing_values_count = total_demand_df['TOTALDEMAND'].isna().sum()
+
+# Drop missing values or use any method you prefer to handle missing values
+total_demand_df = total_demand_df.dropna()
+
+# drop duplicated rows
+total_demand_df = total_demand_df.drop_duplicates()
+```
+
+## Assumptions
+
+*Comments from template:What assumptions are you making on the data?*
+
+## Modelling Methods
+
+# Exploratory Data Analysis
+
+```{python merge-demand-temp}
+# Merge demand and temperature data sets
+merged_df = pd.merge(total_demand_df, temp_df, on = 'DATETIME', how = 'inner')
+
+merged_df.head(5)
+
+merged_df.info()
+merged_df.describe()
+```
+
+*Comments from template:This is where you explore your data using histograms, scatterplots, boxplots, numerical summaries, etc.*
+
+Tried scatter plot and linear model plot. It is clear that the linear plot is not the best model to utilise.
+
+```{python plot-total-demand-vs-temp}
+# Plot total demand vs temperature
+#plt.scatter(y=merged_df['TOTALDEMAND'], x=merged_df['TEMPERATURE'])
+#plt.xlabel('Temp')
+#plt.ylabel('Demand')
+#plt.show()
+```
+
+
+# Demand Forecasting
+
+## Prepare Data
+
+```{python prepare-data}
+# Override the default linewidth and markersize
+plt.rcParams['lines.linewidth'] = 1
+plt.rcParams['lines.markersize'] = 5
+
+color_pal = sns.color_palette()
+plt.style.use('fivethirtyeight')
+
+# Load the total energy demand data for NSW
+# total_demand_path = ('/content/totaldemand_nsw.csv')
+#total_demand_path = ('../../data/totaldemand_nsw.csv')
+#total_demand_df = pd.read_csv(total_demand_path)
+#total_demand_df
+
+# Make a copy of original data
+orignal_df = total_demand_df.copy()
+#total_demand_df.head(4)
+
+```
+
+
+Set index for Date/Time:
+
+```{python date-time-index}
+total_demand_df = total_demand_df.set_index('DATETIME')
+total_demand_df.index = pd.to_datetime(total_demand_df.index)
+
+all_day_df = total_demand_df.copy()
+
+#total_demand_df.describe()
+
+```
+
+
+## Plot Total Demand
+
+```{python plot-total-demand-distribution, out.width = "100%", fig.cap = "Total Demand Distribution"}
+fig, ax = plt.subplots(figsize=(15, 5))
+sns.distplot(total_demand_df["TOTALDEMAND"], color="green")
+ax.set_title("Total Demand Distribution")
+plt.show()
+
+```
+
+### Add Year / Month / Day to the original data frame:
+
+```{python total-demand-by-YMD}
+# Create a copy of the original DataFrame and add 'Year' column
+year_df = total_demand_df.copy()
+year_df['Year'] = year_df.index.year
+
+# Create a copy of the original DataFrame and add 'Month' column
+month_df = total_demand_df.copy()
+month_df['Month'] = month_df.index.month
+
+# Create a copy of the original DataFrame and add 'Day' column
+day_df = total_demand_df.copy()
+day_df['Day'] = day_df.index.day
+
+```
+
+
+### Plot Total Demand by Year
+
+```{python plot-total-demand-by-year, out.width = "100%", fig.cap = "Total Demand Distribution by Year"}
+# Plot Total Demand by Year
+fig, ax = plt.subplots(figsize=(15, 5))
+sns.lineplot(x='Year', y='TOTALDEMAND', data=year_df, color="green").set_title('Demand distribution by Year')
+
+# Get unique years and set them as xticks
+unique_years = year_df['Year'].unique()
+plt.xticks(unique_years, rotation=45)
+
+plt.show()
+
+```
+
+
+### Plot Total Demand by Month
+
+```{python plot-total-demand-by-month, out.width = "100%", fig.cap = "Total Demand Distribution by Month"}
+# Plot Total Demand by Month
+fig, ax = plt.subplots(figsize=(15, 5))
+sns.lineplot(x='Month', y='TOTALDEMAND', data=month_df, color="green").set_title('Demand distribution by Month')
+
+# Set x-ticks to show all 12 unique months
+plt.xticks(range(1, 13))  # 12 unique months from 1 to 12
+
+plt.show()
+
+```
+
+
+### Plot Total Demand by Day
+
+```{python plot-total-demand-by-day, out.width = "100%", fig.cap = "Total Demand Distribution by Day"}
+# Plot Total Demand by Day
+fig, ax = plt.subplots(figsize=(15, 5))
+sns.lineplot(x='Day', y='TOTALDEMAND', data=day_df, color="green").set_title('Demand distribution by Day of the Month')
+
+# Set x-ticks to show days in increments of 3
+plt.xticks(range(1, 32, 3))  # Days of the month from 1 to 31 in increments of 3
+
+plt.show()
+
+```
+
+
+### Plot Total Demand by Year / Month / Day
+
+```{python plot-total-demand-by-year-month-day, out.width = "100%", fig.cap = "Total Demand Distribution by Year / Month / Day"}
+# Create a copy of the original DataFrame and add 'Year', 'Month', and 'Day' columns
+new_df = total_demand_df.copy()
+new_df['Year'] = total_demand_df.index.year
+new_df['Month'] = total_demand_df.index.month
+new_df['Day'] = total_demand_df.index.day
+
+# Plot Total Demand by Year / Month / Day
+fig, ax = plt.subplots(figsize=(20, 10))
+sns.lineplot(x='Month', y='TOTALDEMAND', hue='Year', palette='tab20', data=new_df).set_title('Demand distribution by Month')
+
+# Set x-ticks to show all 12 unique months
+plt.xticks(range(1, 13))  # 12 unique months from 1 to 12
+
+# Move the legend to the edge of the plot
+plt.legend(loc='upper right', bbox_to_anchor=(1, 1))
+
+plt.show()
+
+```
+
+## Total Demand Trend, Seasonal and Residual
+
+Total demand data contains records with missing values. We will exclude the records with missing values, and only perform analysis on records with valid values.
+
+```{python plot-total-demand-trend-residual, out.width = "100%", fig.cap = "Total Demand Trend, Seasonal and Residual"}
+# Identify missing values
+missing_values_count = total_demand_df['TOTALDEMAND'].isna().sum()
+print(f"Number of missing values in 'TOTALDEMAND': {missing_values_count}")
+
+# Drop missing values or use any method you prefer to handle missing values
+total_demand_df = total_demand_df.dropna()
+
+# Perform seasonal decomposition
+ANNUAL_PERIOD = 365 * 24
+mult_decomp = seasonal_decompose(total_demand_df['TOTALDEMAND'], model='multiplicative', period=ANNUAL_PERIOD)
+
+# Initialize the matplotlib figure with larger size
+fig, axes = plt.subplots(4, 1, figsize=(20, 12))
+
+# Plot each component
+axes[0].plot(mult_decomp.observed, color='blue')
+axes[0].set_title('Observed')
+axes[0].set_ylabel('Demand')
+
+axes[1].plot(mult_decomp.trend, color='green')
+axes[1].set_title('Trend')
+axes[1].set_ylabel('Demand')
+
+axes[2].plot(mult_decomp.seasonal, color='red')
+axes[2].set_title('Seasonal')
+axes[2].set_ylabel('Demand')
+
+axes[3].plot(mult_decomp.resid, color='purple')
+axes[3].set_title('Residual')
+axes[3].set_ylabel('Demand')
+axes[3].set_xlabel('Time')
+
+# Show the plot
+plt.tight_layout()
+plt.show()
+
+
+```
+
+
+## Perform Seasonal Decomposition
+
+```{python plot-total-demand-seasonal, out.width = "100%", fig.cap = "Seasonal Decomposition"}
+# Perform seasonal decomposition
+ANNUAL_PERIOD = 365 * 24
+mult_decomp = seasonal_decompose(total_demand_df['TOTALDEMAND'], model='multiplicative', extrapolate_trend='freq', period=ANNUAL_PERIOD)
+
+plt.figure(figsize=(16, 6))
+plt.title('Seasonal Component')
+plt.plot(mult_decomp.seasonal, color='green')  # Set the color to green
+plt.xlabel('Time')
+plt.ylabel('Seasonal Effect')
+plt.show()
+
+```
+
+## Plot trend component
+
+```{python plot-total-demand-trend, out.width = "100%", fig.cap = "Total Demand Trend"}
+# Plot only the trend component
+plt.figure(figsize=(16, 6))
+plt.title('Trend Component')
+plt.plot(mult_decomp.trend, color='green')
+plt.xlabel('Time')
+plt.ylabel('Trend')
+plt.show()
+
+```
+
+## Plot residual component
+
+```{python plot-total-demand-residual, out.width = "100%", fig.cap = "Total Demand Residual"}
+# Plot only the residual component
+plt.figure(figsize=(16, 6))
+plt.title('Residual Component')
+plt.plot(mult_decomp.resid, color='green')
+plt.xlabel('Time')
+plt.ylabel('Residual')
+plt.show()
+
+```
+
+## Plot Total Electricity Demand in NSW
+
+```{python plot-total-demand-nsw, out.width = "100%", fig.cap = "Total Demand in NSW"}
+total_demand_df.plot(style='.',
+        figsize=(15, 5),
+        color='green',  # Set the color to green
+        title='Total electricity demand in NSW')
+plt.show()
+
+```
+
+
+# Total Demand vs Estimated Resident Population {.label:s-demand-vs-population}
+
+We hypothesised that as population is growing, the demand for energy is also increasing. In this section, we will perform an analysis to understand if our hyphothesis is true.
+
+```{python prepare-data-total-demand-vs-population, out.width = "100%"}
+
+# Read NSW estimated population data
+pop_nsw_path = ('../../data/NSW estimated population.xlsx')
+pop_nsw_df = pd.read_excel(pop_nsw_path)
+
+# Set index on Date in order to integrate with total demand data.
+pop_nsw_df = pop_nsw_df.set_index('Date')
+pop_nsw_df.index = pd.to_datetime(pop_nsw_df.index)
+
+# Read total demand and temperature data
+data_demand = pd.read_csv('../../data/merged_df.csv')
+
+# Set 'DATETIME' as the index and convert it to DateTime type
+data_demand.set_index('DATETIME', inplace=True)
+data_demand.index = pd.to_datetime(data_demand.index)
+
+# Filter the DataFrame to only include data from 2010 onwards
+pop_df_filtered = pop_nsw_df[pop_nsw_df.index >= '2010-01-01']
+
+# Filter the DataFrame to only include data from March 1, 2010, and onwards
+filtered_data = data_demand[data_demand.index >= '2010-03-01']
+
+# Select just the 'TOTALDEMAND' column
+selected_data = filtered_data[['TOTALDEMAND']]
+
+# Resample the data to quarterly, setting label and closed to 'left'
+quarterly_data = selected_data.resample('Q', label='left', closed='left').mean()
+
+## Merge population data with total demand data
+# Sort both indices before merging
+pop_df_filtered.sort_index(inplace=True)
+quarterly_data.sort_index(inplace=True)
+
+# Perform the asof merge
+merged_df = pd.merge_asof(quarterly_data, pop_df_filtered, left_index=True, right_index=True)
+merged_df.drop(merged_df.index[0], inplace=True)
+
+```
+
+## Correlation Between Estimated Resident Population and Total Demand
+
+The figure below shows the correlation between the estimated resident population and total demand.
+
+```{python plot-total-demand-vs-population-correlation, out.width = "100%", fig.cap = "\\label{plot-total-demand-vs-population-correlation} Correlation Between Estimated Resident Population and Total Electricity Demand"}
+
+## Plot correlation between estimated resident population and total demand
+# Set the figure size
+plt.figure(figsize=(18, 9))  # Making the plot wider and taller
+
+# Create a scatter plot with regression line
+sns.regplot(x='Estimated Resident Population', y='TOTALDEMAND', data=merged_df,
+            scatter_kws={'color': 'purple'},  # Setting scatter plot color to purple
+            line_kws={'color': 'green'})  # Setting line color to green
+
+# Add labels and title
+plt.xlabel('Estimated Resident Population')
+plt.ylabel('Total Electricity Demand')
+plt.title('Correlation Between Estimated Resident Population and Total Electricity Demand')
+
+# Show the plot
+plt.show()
+
+```
+
+The correlation between total demand and resident population is also presented in the heatmap below.
+
+```{python plot-total-demand-vs-population-heatmap, out.width = "100%", fig.cap = "Correlation matrix between total demand and population"}
+
+## Plot demand and temperature correlation matrix
+
+# Calculate the correlation matrix
+corr_matrix = merged_df.corr()
+
+# Set the figure size
+plt.figure(figsize=(10, 7))
+
+# Create a heatmap with annotations and a custom color map
+sns.heatmap(corr_matrix, annot=True, cmap=sns.color_palette("coolwarm"))
+
+# Rotate x and y tick labels
+plt.xticks(rotation=45)
+plt.yticks(rotation=45)
+
+# Show the plot
+plt.show()
+
+```
+
+## Total Demand vs Estimated Resident Population Pairplot
+
+```{python plot-total-demand-vs-population-pairplot, out.width = "100%", fig.cap = "Total Demand vs Estimated Resident Population Pairplot"}
+
+## Plot total demand
+
+# Assume merged_df is your DataFrame
+sns.pairplot(merged_df, height=2.5, plot_kws={"color": "green"})
+
+# Adjust the size of the entire pairplot
+#plt.gcf().set_size_inches(15, 10)
+
+#plt.show()
+
+```
+
+## Residual of Estimated Resident Population vs Total Energy Demand
+
+The figure below shows the residual of estimated resident population vs total energy demand.
+
+```{python plot-total-demand-vs-population-residual, out.width = "100%", fig.cap = "Total Demand vs Estimated Resident Population Residual"}
+
+## Plot the estimated resident population vs total demand
+
+# Set the figure size
+plt.figure(figsize=(18, 9))  # Making the plot wider and taller
+
+# Create a residual plot
+sns.residplot(x='Estimated Resident Population', y='TOTALDEMAND', data=merged_df, color='green')
+
+# Add labels and title
+plt.xlabel('Estimated Resident Population')
+plt.ylabel('Residuals')
+plt.title('Residual Plot of Estimated Resident Population vs Total Electricity Demand')
+
+# Show the plot
+plt.show()
+
+```
+
+## Yearly Distribution of Energy Demand vs Population
+
+```{python plot-total-demand-vs-population-yearly-distribution, out.width = "100%", fig.cap = "Total Demand Distribution by Year"}
+
+## Plot yearly distribution of total electricity demand
+# Set the figure size
+plt.figure(figsize=(15, 8))
+# Adding a Year column by extracting it from the DATETIME index
+merged_df['Year'] = merged_df.index.year
+
+# Create the boxplot
+sns.boxplot(x='Year', y='TOTALDEMAND', data=merged_df)
+
+# Add a title
+plt.title('Yearly Distribution of Total Electricity Demand')
+
+# Show the plot
+plt.show()
+
+```
+
+## Discussion
+
+Figure \ref{fig:plot-total-demand-vs-population-correlation} shows that our hypothesis is false, as the population is increasing over the years, but the energy demand is decreasing.
+
+# Demand Forecasting - from Nezam
+
+
+## Data Wrangling
+
+```{python data-wrangling}
+#tot_demand = pd.read_csv('/Users/nizam/Desktop/data/totaldemand_nsw.csv')
+tot_demand = pd.read_csv('../../data/totaldemand_nsw.csv')
+
+#tot_demand.dtypes # DATETIME is object
+# convert to a datetime object
+tot_demand['DATETIME'] = pd.to_datetime(tot_demand['DATETIME'])
+
+# Check for duplicate DATETIME
+duplicate_rows = tot_demand[tot_demand.duplicated(keep=False)] # keep=False to see all the duplicates
+
+# drop duplicated rows
+tot_demand = tot_demand.drop_duplicates()
+
+# Set DATETIME feature as index
+tot_demand_copy = tot_demand.copy()
+tot_demand_idx=tot_demand_copy.set_index('DATETIME')
+print(tot_demand_idx)
+
+```
+
+
+## Create some functions
+
+```{python function-defs}
+# root mean squared error (rsme)
+def rmse(pred, actual): 
+	return np.sqrt(((pred-actual)**2).mean())
+
+# mean absolute percentage error (mape)
+def mape(actual, pred):
+    return np.mean(np.abs((actual - pred) / actual)) * 100
+
+# Create time series features based on time series index
+def create_features(df):
+    df['YEAR'] = df.index.year
+    df['MONTH'] = df.index.month
+    df['DAY_OF_WEEK'] = df.index.dayofweek
+    df['DAY'] = df.index.day
+    df['HOUR'] = df.index.hour
+    df['HALF_HOUR'] = df.index.minute//30
+    
+    return df
+
+```
+
+## Exploratory Data Analysis for energy "totaldemand" data
+
+We plot demand against datetime to observe the pattern of energy demand.
+
+```{python plot-total-demand-what-if}
+fig = px.line(tot_demand, x="DATETIME", y="TOTALDEMAND", title="Energy Demand with slider", height=600) # width
+fig.update_xaxes(
+    rangeslider_visible=True,
+    rangeselector=dict(
+        buttons=list([
+            dict(count=1, label="1y", step="year", stepmode="todate"),
+            dict(count=2, label="2y", step="year", stepmode="todate"),
+            dict(count=3, label="3y", step="year", stepmode="todate"),
+            dict(step="all")
+        ])
+    )
+)
+fig.show()
+
+```
+
+## Auto correlation
+
+```{python plot-total-demand-correlation}
+# using lag_plot
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=1) # 1lag = 5 mints
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12) # lag12 = 5*12= 60 mints =1hr
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12*24) # lag12*24 = 5*12*24= 1day
+pd.plotting.lag_plot(tot_demand["TOTALDEMAND"], lag=12*24*365) # 1year
+
+# Using auto correlation
+pd.plotting.autocorrelation_plot(tot_demand_idx["2010":"2022"]["TOTALDEMAND"].resample("1m").mean())
+
+```
+
+## Visualise Features and Target Relationship
+
+# Analysis and Results
+
+## A First Model
+
+The linear regression, Multi-Layer Perceptron, Random Forest, and XGBoost where utilised to determine which model would produce the best model.  From the results below, XGBoost produced the best results.
+
+			
+| Model                  |      MAPE    |  MAE        |  RMSE       |
+|------------------------|:------------:|------------:|------------:|
+| Linear Regression      |  11.422454   | 883.415912  | 1146.063741 |
+| Multi-Layer Perceptron |  13.720681   | 1007.229344 | 1222.412947 |
+| Random Forest	         |  11.320506 	| 833.064464	| 1083.928643 |
+| XGBoost     	         |   5.355163  	| 398.512066	|  539.366850 |
+
+XGBoost (eXtreme Gradient Boosting) a more direct route to the minimum error, converging more quickly with fewer steps, and simplified calculations to improve speed and lower compute costs. It outperforms other algorithms like Random Forest, Multi-Layer Perceptron (MLP), and Linear Regression for several reasons.
+
+Handling Non-Linearity and Interactions: XGBoost can capture complex relationships and interactions in the data, even when they are non-linear. This is particularly important in scenarios where the relationship between features and the target variable is not well-described by a linear model.
+
+Ensemble Learning: XGBoost is an ensemble method that combines the predictions of multiple weak learners (usually decision trees) to create a strong learner. This can lead to more accurate and robust predictions compared to individual models like Random Forest or a single MLP.
+
+Gradient Boosting: XGBoost uses gradient boosting, which builds trees sequentially. Each tree corrects the errors of the previous ones. This allows XGBoost to focus on the harder-to-predict cases and learn from its mistakes.
+
+Regularization: XGBoost has built-in L1 (Lasso) and L2 (Ridge) regularization, which helps prevent overfitting by penalizing complex models. This is especially useful when dealing with high-dimensional data.
+
+Handling Missing Data: XGBoost can handle missing data internally. It automatically learns how to treat missing values during the training process, reducing the need for imputation or data preprocessing.
+
+Feature Importance: XGBoost provides a feature importance score, which helps identify the most influential features in the model. This can be useful for understanding which features are driving the predictions.
+
+Efficiency and Speed: XGBoost is highly optimized for performance. It's designed to be memory efficient and can be parallelized, allowing it to handle large datasets and train models relatively quickly.
+
+Tuning Options: XGBoost provides a wide range of hyperparameters that can be fine-tuned to improve performance. This includes parameters controlling tree depth, learning rate, and regularization.
+
+Wider Applicability: While Random Forest is based on bagging and tends to work well for a variety of tasks, XGBoost's gradient boosting approach can be particularly effective in situations where there are a large number of features or where predictive accuracy is crucial.
+
+# Discussion
+
+Put the results you got in the previous chapter in perspective with respect to the problem studied.
+
+# Conclusion and Further Issues {.label:ccl}
+
+What are the main conclusions? What are your recommendations for the "client"? What further analysis could be done in the future?
+
+# References {-}
+
+<div id="refs"></div>
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+# Appendix {-}
+
+## Sourcing Public holidays 
+
+We did not take in consideration the local holidays since it changes depending on the council, and the current demand and temp data sets do not have local council data.
+
+### Source of data 
+
+- [2011: Nager.Date - Public Holidays in Australia 2011](https://date.nager.at/PublicHoliday/Australia/2011)
+- [2012: Nager.Date - Public Holidays in Australia 2012](https://date.nager.at/PublicHoliday/Australia/2012)
+- [2013-2015: NSW Public Holidays 2013-2015](https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/nsw-public-holidays-2013-2015/)
+- [2019-2020: NSW Public Holidays 2019-2020](https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/nsw-public-holidays-2019-2020/)
+- [2014-2024: Australian Public Holidays Dates Machine Readable Dataset](https://data.gov.au/data/dataset/australian-holidays-machine-readable-dataset) 
+
+
+
+
+
+
+

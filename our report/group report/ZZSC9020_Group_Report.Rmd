@@ -1,0 +1,921 @@
+---
+title: "Forecasting Energy Demand in New South Wales: An Analysis of Temperature, Regional Reference Price, Holidays, and Time Series Data, with an Examination of Demand in Relation to Population Growth"
+team: Group K
+session: Hexamester 5, 2023
+coursecode: ZZSC9020
+author: 
+  - "Abdelrhman Dameen (z5427841), "
+  - "Md Nezam Uddin (z5339862), "
+  - "Pam Moodley (z5366156), "
+  - "Van Hai Ho (z3071030)"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+Acknowledgements: 
+  - "We would like to express our sincere gratitude to several individuals and organizations for supporting us throughout this project. First, we wish to express our sincere gratitude to our supervisors, Sarat Moka, Wei Tian, and Armin Chitizadeh for their enthusiasm, patience, insightful comments, helpful information, practical advice and unceasing ideas that have helped us tremendously at all times in our research and writing of this report.  Their immense knowledge, profound experience and professional expertise in analysis Quality Control has enabled us to complete this research successfully. Without their support and guidance, this project would not have been possible. We could not have imagined having better supervisors in our study."
+  - "We are also grateful to the following Group K team members: Abdelrhman Dameen,  Md Nezam Uddin, Pam Moodley, and Van Hai Ho for their consistent support and assistance."
+  - "Finally, last but by no means least; also to everyone in Endgame Economics for providing the dataset and for the great insights, time, and effort especially Oliver Nunn and Dr. Jack Simpson."
+  - "Thanks for all your encouragement!"
+  
+Abstract: 
+  - "This research report investigates the factors influencing energy demand in New South Wales, with an emphasis on variables such as temperature, price, holidays, and time-series data. The study also examines the relationship between energy demand and population growth."
+  
+  - "Energy demand forecasting is essential for maintaining a sustainable energy infrastructure and for policy planning. With the challenges posed by climate change and urbanization, precise forecasting models are increasingly crucial for efficient energy resource management."
+
+  - "Despite various models exploring energy demand, few studies comprehensively analyze how specific factors such as regional reference prices and holidays impact demand, and even fewer examine these in relation to population growth in New South Wales. How do temperature, prices, holidays, and population growth impact energy demand in New South Wales? Can machine learning models effectively forecast energy demand?"
+
+  - "A variety of machine learning algorithms were employed, including Linear Regression, Multi-Layer Perceptron, Random Forest, Facebook Prophet, and XGBoost. These models were assessed using metrics such as MAPE, MAE, and RMSE. Machine learning models, particularly XGBoost, can offer nuanced and effective forecasts of energy demand. Time-series data, regional reference prices, holidays, and population trends are significant variables influencing energy demand. Among the models used, XGBoost showed the best performance with a 7% MAPE score."
+
+  - "Factors such as temperature, price of energy, and holidays are significant predictors. This research enhances our understanding of the multifaceted factors affecting energy demand in New South Wales. It demonstrates that machine learning algorithms, especially ensemble models such as XGBoost, can be powerful tools in energy demand forecasting. By acknowledging the importance of regional factors such as population growth and holidays, this study contributes to more accurate and region-specific energy demand models."
+  
+output:
+  pdf_document:
+    template: template.tex
+    md_extensions: +raw_attribute
+    keep_md: true 
+    keep_tex: true 
+    pandoc_args:
+    - --top-level-division="chapter"
+    - --bibliography="references.bib"
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: yes
+  word_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
+    fig_caption: true
+bibliography: references.bib
+csl: university-of-south-wales-harvard.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.pos = "H", out.extra = "", echo = FALSE)
+# Sys.setenv(RETICULATE_PYTHON = "C:\\Apps\\Python311\\python.exe")
+# RETICULATE_PYTHON="C:\\Apps\\Python311\\python.exe"
+library(reticulate)
+if (.Platform$OS.type == "unix") {
+ use_python("/usr/bin/python")
+} else if (.Platform$OS.type == "windows") {
+  # use_python("C:\\Apps\\Python311\\python.exe")
+}
+# use_python("C:/Apps/Python311/python.exe")
+
+matplotlib <- import("matplotlib")
+matplotlib$use("Agg", force = TRUE)
+```
+
+
+```{python import, echo = FALSE}
+import os 
+#from window_ops.rolling import rolling_mean, rolling_max, rolling_min
+import numpy as np
+import pandas as pd
+
+# Importing 'datetime' from Python standard library
+from datetime import datetime
+
+# Import plot libraries for plotting
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Import sklearn libraries
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import make_pipeline
+
+from calendar import month_abbr as months
+
+# Import XGBoost
+import xgboost as xgb
+from xgboost import XGBRegressor
+
+# Import statsmodels for seasonal decomposition
+from statsmodels.tsa.seasonal import seasonal_decompose
+
+import plotly.graph_objs as go
+import plotly.express as px 
+
+import lightgbm as lgb
+
+import warnings
+warnings.filterwarnings("ignore")
+
+```
+
+
+# Introduction {#s-introduction}
+
+The volatility of energy supply and demand poses a challenge for suppliers to enter and remain profitable in the market. Accurately predicting and efficiently supplying energy to the grid is critical for profitability. A key determinant of energy demand is weather; heating is necessary when temperatures drop, and air conditioning becomes essential as temperatures rise. Therefore, this analysis aims to examine the influence of weather on energy demand, considering the significant effects of global warming and erratic weather patterns.
+
+
+However, other variables also come into play. As the International Atomic Energy Agency suggests, "The analysis should be conducted with relevant and consistent macroeconomic and microeconomic data, so that electricity demand projections can be more reliable and consistent with demographic, economic and industrial development projections" (@iea-world-energy-outlook-2016). This sentiment is further echoed by Emami Javanmard and Ghaderi who state, "The increase in population and economic growth of countries has led to a rise in energy consumption, which has created several challenges and problems for governments and nations" (@Javanmard-et-al-2023-energy-demand-forecast).
+
+
+Considering these challenges, the project will explore daily and seasonal variations, as well as the impact of holidays on energy demand. By incorporating these factors, we intend to highlight the benefits of using machine learning models for more efficient demand prediction, a point also emphasized by a report stating, "The demand for energy continues to grow as the world's population increases. And to ensure we meet these demands, utility and energy companies need reliable energy demand forecasting" (@eia-2020-global-electricity-consumption-population).
+
+
+Specifically, we will uncover hidden temporal trends in demand, including daily and seasonal fluctuations, through the identification of energy consumption patterns. “According to the Global Energy Statistical website, energy consumption worldwide has increased by approximately 70% from 1990 to 2020” (@perle-2023-predicting-power). We will try to understand how variables such as temperature impact energy demand. Furthermore, we will analyze the effect of holidays and special events on demand, aiding better planning efforts.
+
+
+In New South Wales, the government anticipates exponential population growth, but this prediction may not sufficiently account for the intertwined relationship between energy resources and population capacity.
+
+
+As populations grow, the demand for energy escalates, putting strain on existing resources. This can make energy sources scarcer and more difficult to extract, exemplified by the need to mine deeper for coal or explore complex environments for oil. The scarcity leads to declining marginal returns in energy extraction, pushing the quest for new energy sources. These new sources, in turn, can expand the Earth's carrying capacity, enabling further population growth.
+
+
+Therefore, the correlation between energy availability and population size could imply that if energy resources are nearing their peak production rates, New South Wales might also be approaching its maximum sustainable population. Hence, planning for the future should factor in these variables to create more accurate and sustainable growth forecasts. "In economies experiencing rapid residential electricity consumption and burgeoning energy-intensive activities, there is a notable link between economic growth and electricity use. Specifically, in less developed non-OECD countries, per capita electricity growth more than doubled from 2000 to 2017. This is in stark contrast to the nearly flat trend observed in more developed OECD countries” (@Wolde-Rufael-2006-electricity-consumption-economic-growth).
+
+
+We hypothesize that growing population correlates with increasing energy demand. To confirm or refute this, we will perform an analysis that may also reveal other influential factors. Consequent to our analysis, policy recommendations will be provided to aid in energy policy formulation, including diversification of energy sources to meet demand. We aim to develop a machine learning model capable of predicting future energy demand with high accuracy, incorporating all the identified variables.
+
+
+Electricity demand forecasting is an indispensable tool for managing the power grid and ensuring a reliable supply. It is a complex task, influenced by a multitude of factors. While traditional forecasting methods have their merits, there is growing interest in employing machine learning algorithms such as Linear Regression, Random Forest, and XG Boost for more accurate predictions.
+
+
+For model performance evaluation, metrics such as Root Mean Square Error (RMSE), Mean Absolute Error (MAE), and Mean Absolute Percentage Error (MAPE) will be used, given the time-dependent nature of the data. These metrics will serve as complementary tools for a comprehensive evaluation of our forecasting models.
+
+
+Two common approaches to forecasting energy demand are top-down and bottom-up. The top-down approach focuses on macro factors such as the economy, population growth, and weather, while the bottom-up approach examines energy consumption at the individual or company level. Both methods contribute to understanding future energy needs.
+
+
+The subsequent sections of this report are organized as follows: Chapter \ref{s-literature-review} presents a literature review, establishing the relevance and importance of our study for policymakers in New South Wales and the energy sector. Chapter \ref{s-material-methods} elaborates on the methods, machine learning algorithms, and evaluation benchmarks. Chapter \ref{s-data-analysis} delves into the data, exploring descriptive statistics and outlier analysis, prepares the data for the main model and explores various visual plots, examines the relationship between total demand and the estimated population of New South Wales. Chapter \ref{s-analysis-results} analyzes and compares the results to other metrics, while Chapter \ref{s-discussion} discusses these results. Finally, Chapter \ref{s-conclusion} concludes the report, offering recommendations and addressing further issues.
+
+
+
+# Literature Review {#s-literature-review}
+
+When looking at the previous studies, papers and approaches for electricity demand forecast we discovered the use of different methods manual and automated, techniques in a way of forecasting energy demand, some of them addressed more ML methods. Other studies examined the broad applications of ML in energy system. Our unique focus on Demand in NSW electrical demand prediction offers deeper understanding, to the point of challenging conventional wisdom about things such as the connection between pricing and temperature and the relationship between population increase and forecast issues. It is important to note, however, that we discuss deeper ways in which grid search is used to find the optimal model, in addition to pure applications of some benchmark measures to analyse the performance of our primary model.
+
+
+In his paper (@zabel-G-2009), Graham Zabel examines the sum-of-energies concept in relation to population expansion, highlighting its broad-reaching ramifications. Zabel acknowledges a number of aspects, including population control and natural catastrophes, but contends that energy resources have an indirect influence on these concerns. Instead of  going into depth on particular energy sources such as nuclear or hydroelectricity, the study primarily focuses on the significance of fossil fuels in influencing world population trends. According to Zabel, determining Earth's carrying capacity requires a knowledge of the interactions between energy resources and population development.
+
+
+The 2023 paper by Pelka (@pelka-p-2023), titled "Analysis and Forecasting of Monthly Electricity Demand Time Series Using Pattern-Based Statistical Methods," focuses on the vital duty of precisely predicting monthly electricity load (MEL). Given that energy must be produced in real-time, the article, which was published in Energies, emphasises the significance of exact projections for sustaining affordable and dependable power systems. Pelka investigates a range of forecasting models, including traditional techniques, neural networks, and deep learning. In order to make complicated interactions between variables easier to understand, the study introduces the use of pattern representation in statistical approaches. Additionally, it emphasises how crucial it is to comprehend stationary time series in order to make precise predictions. The paper analyses data from Poland and 35 European nations to highlight the difficulties in MEL time series data, including non-linear trends and seasonal changes.
+
+
+Writing for the U.S. Energy Information Administration Ari Kahan (@iea-world-energy-outlook-2016) states the world's power consumption is growing faster than its population. The emerging, non-OECD nations where the per capita power usage more than quadrupled between 2000 and 2017 are where this trend is most pronounced. In contrast, the use of energy has mostly followed a flat trend in industrialised OECD nations. Improvements in lighting technology and other efficiency measures have helped to somewhat offset this increase in usage. Kahan points out that in less developed countries, using more electricity per person is directly tied to economic growth. However, this isn't necessarily true for big, industrialized nations. Using the United States as an example, where per capita energy usage differs significantly from state to state, he also notices notable within-country variations.
+
+
+In their recent paper from 2023 titled "Energy demand forecasting in seven sectors by an optimization model based on machine learning algorithms," Majid Emami Javanmard and S.F. Ghaderi (@emami-2023) explored long-term forecasting energy demand in Iran up to 2040. 
+They employed a range of machine learning algorithms, including ANN, AR, ARIMA, SARIMA, SARIMAX, and LSTM, and integrated them with mathematical programming. 
+In especially for Iran, the study emphasises the urgent problem of rising energy demand as people and economies expand. To improve their integrated model, the authors carefully assess the forecast accuracy of each algorithm in each industry. By providing a multi-algorithmic approach that takes into consideration the intricacies and variances of many sectors, this study adds to the body of literature already in existence. Additionally, they assess the performance of their integrated model using five criteria for prediction accuracy, demonstrating that their approach yields predictions that are more accurate than those produced by independent machine learning methods.
+
+
+Shereen Elsayed, Daniela Thyssens, Ahmed Rashed, Hadi Samer Jomaa, and Lars Schmidt-Thieme (@elsayed-2021) demonstrate in their recent 2021 paper titled "Do We Really Need Deep Learning Models for Time Series Forecasting?" that XGBoost outperforms deep learning models for time series forecasting. They also prove that time series forecasting has a long history of simple models, such as exponential smoothing and linear models, outperforming more complicated ones.
+The paper presents several assertive statements that bear resemblance to assertions in the realm of scientific discourse, rather than embodying a strictly objective pursuit of knowledge.
+
+1.	The paper claims that GBRT predictions outperform "state-of-the-art" neural forecasting methods, most of which are five years old, casting doubt on the seriousness of all their experiments. In the authors' words: "Stronger transformer-based models, such as the temporal fusion transformer, rightfully surpass the boosted regression tree."
+
+2.	It is suspiciously convenient that all nine benchmark datasets considered in the experiments are high-frequency.
+
+
+Recently the government of NSW introduced a energy efficient program it started in 2009 and will run until 2050. (@environment-2023) These incentives give businesses and residents who own a home as well as companies financial incentives to upgrade their appliances and power outlets to a more energy-efficient one.   
+The state construction codes have also been changed to ensure that all newly constructed homes have better and more effective energy ratings, which will lower the need for electricity even if the population is continuously growing.
+
+
+Our analysis aims to establish a generalized model for forecasting energy demands in NSW, which has both long-term and short-term forecasting implications. and it uses a grid_search model to look for the best model and It employs multi-objective models that consider various machine learning algorithms to improve forecasting accuracy. It aims to provide energy suppliers and policymakers with valuable insights for better demand management, thus ensuring a stable and reliable energy supply for the NSW population.
+
+
+# Material and Methods {#s-material-methods}
+
+## Software
+
+Python, R/RSudio, and Jupyter Notebook software are used to Analyse the data. Libraries and packages such as pandas, matplotlib, seaborn for Python and ggplot2, dplyr, caret for R are required in this analysis. RMarkdown, knitr are also utilized for putting the analysis together. 
+
+Scikit-learn is a machine learning library in Python, widely used in this analysis. The algorithms we used for forecasting such as Linear Regression, Multi-Layer Perceptron, Random Forest and XGBoost are all available in scikit-learn library.  
+
+For project management, cloud storage, version control and code collaboration GitHub gave us pro level access as a student.  
+
+## Description of the Data
+
+We will use the provided data sets as our core data for our analysis, including:
+
+* *totaldemand_nsw.csv*: Total Demand data.
+
+* *temperature_nsw.csv*: Temperature data.
+
+The data will need further analysis and cleaning, including the removal of invalid and outlier data before being utilised to generate the demand forecast.
+
+### Total Demand data
+
+The Total Demand data provided in file *totaldemand_nsw.csv* contains energy demand in 5-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is in a comma-delimited file format, with columns labeled Datetime, RegionId, and TotalDemand. The RegionId consists only of NSW1, which indicated there would not be a need to filter the data.
+
+```{python total-demand, include = FALSE}
+# Read Total Demand data from file HIDE THIS ENTIRE OUTPUT
+total_demand_df = pd.read_csv('../../data/totaldemand_nsw.csv')
+
+# Number of records in Total Demand data set
+# demand_df.count()
+
+#Update the type for the datetime
+total_demand_df.dtypes
+total_demand_df[['DATETIME']] = total_demand_df[['DATETIME']].apply(pd.to_datetime)
+
+#Show the details of the temperature data set
+total_demand_df.describe()
+```
+```{python total-demand-display , echo = FALSE}
+# Snippet of Total Demand data HIDE THIS ENTIRE OUTPUT
+# total_demand_df.head(4)
+```
+
+### Temperature data
+
+The temperature data provided in file *temperature_nsw.csv* is in 30-minute intervals from January 1, 2010, to August 1, 2022, for New South Wales. The data is provided in a comma-delimited file format, with headings DateTime, Location, and Temperature (in Celsius). The source of the temperature data is the Bankstown weather location which is in New South Wales. 
+
+```{python temperature, include = FALSE}
+# Read Temperature data from file HIDE THIS ENTIRE OUTPUT
+temp_df = pd.read_csv('../../data/temperature_nsw.csv')
+
+# Number of records in Temperature data file
+#temp_df.count()
+
+#inspect the datatypes 
+# temp_df.dtypes
+
+#set the Date time as a DateTime
+temp_df[['DATETIME']] = temp_df[['DATETIME']].apply(pd.to_datetime)
+
+#Show the details of the temperature data set
+temp_df.describe()
+```
+```{python temp-display, echo = FALSE}
+# Snippet of Temperature data HIDE THIS ENTIRE OUTPUT
+# temp_df.head(4)
+
+```
+
+### NSW Public Holidays
+
+We seek to ascertain whether public holidays would impact the energy demand and what is the pattern and relationship with energy demand. New Sout Wales public holiday data is publicly available from NSW Government Industrial Relations website. 
+
+The data source was manually captured from the different sources, and therefore were in different formats. One file was created for each year to ensure it was simpler to track which years were needed to be found and captured. 
+
+```{python nsw-public-holidays, include = FALSE}
+
+# Define the file path for public holidays
+file_path_publicHolidays = "../../data/school-public_holidays/MergedData/PublicHolidays.csv"
+
+
+#Get public holidays
+#coltypes = {'Date': 'date', 'Holiday': 'string'} HIDE THIS ENTIRE OUTPUT
+#read the file 
+# Read the CSV file into dataframe
+publicHolidays_df = pd.read_csv(file_path_publicHolidays)
+
+publicHolidays_df['Date'] = pd.to_datetime(publicHolidays_df['Date'])
+
+#find problems in data frame
+#problems(publicHolidays_df)
+# display all the data
+# print(publicHolidays_df.head(4))
+
+# make the holiday name lowercase
+publicHolidays_df['Holiday'] = publicHolidays_df['Holiday'].str.lower()
+
+#remove duplicates
+publicHolidays_df = publicHolidays_df.drop_duplicates()
+# Check for duplicates with the date only
+duplicates = publicHolidays_df[publicHolidays_df.duplicated(subset=['Date'])]
+
+# Filter rows with specific dates
+# print(publicHolidays_df[publicHolidays_df['Date'] == '2011-04-25'])
+# print(publicHolidays_df[publicHolidays_df['Date'] == '2017-01-02'])
+
+# Delete the duplicate rows
+publicHolidays_df = publicHolidays_df[~((publicHolidays_df['Date'] == '2011-04-25') & (publicHolidays_df['Holiday'] == 'easter monday'))]
+publicHolidays_df = publicHolidays_df[~((publicHolidays_df['Date'] == '2017-01-02') & (publicHolidays_df['Holiday'] == "new year's day holiday"))]
+```
+
+### Aggregated Price and Demand Data
+
+The Energy price is another factor affecting the energy demand. We use the aggregated price and demand data publicly available at Australian Energy Market Operator (AEMO) website (@aemo-aggregated-price-demand).
+
+Aggregated Price and Demand data is available per month from the year 1998 to the current month. For the purpose of this project, we downloaded data for the year 2010 to 2022.  This accounted to 156 data files being downloaded to integrate with the total demand and temperature data sets. These data files are merged into a single file in the same format with the following headers:
+
+- REGION: NSW Region.
+- SETTLEMENTDATE: Settlement date and time for every 5 minutes.
+- TOTALDEMAND: Total demand at the settlement date and time.
+- RRP: Retail Price.
+- PERIODTYPE: Period Type.
+
+From this data set, only the settlement date and RRP was utilised.
+
+### Population Data
+
+We hypothesised as population grows, the demand for energy increases. Analysis was done to understand if our hyphothesis is true; or false, and what other factors might influence the energy demand. Population data that we use is publicly available at Australian Bureau of Statistics (@abs-population). This data is used in our analysis and is available in our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/blob/main/data/NSW%20estimated%20population.xlsx.
+
+
+### Data set format
+
+All the data sets, i.e. Temperature, Energy Demand, Energy Price, Holidays, and Population is integrated before continuing. When merging these data sets, there is a mismatch in frequency since the demand is in 5-minute intervals and the temperature data is in 30-minute intervals. There are approximately 1.3 million rows of demand data and 247,646 rows of temperature data. When merging the temperature and demand data, the demand data is grouped into 30 minute intervals and the mean is calculated and utilised when merged with the temperature data.
+
+Since this project aims to address questions regarding future energy demand, historical data will be utilized, and the initial data sets provided are an excellent starting point. Additional data will be sourced to enhance these data sets.
+
+As we hypothesised that the energy demand would increase when the population is increasing, we also use population data from Australian Bureau of Statistics to prove our hypothesis. The population data used in this project is available from our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/blob/main/data/NSW%20estimated%20population.xlsx.
+
+Additional factors that could influence the demand is the energy price. To identify the correlations, data from Australian Energy Market Operator is utilised. This data provides the average price of energy demand every 30 minutes. The aggregated price and demand data used in this project is also available from our repository: https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/tree/main/data/Aggregated%20price%20and%20demand%20data.
+
+Majority of the datasets found where either excel sheets or comma delimited files, and these files where read in and analysed.  The holidays data was not in a machine readable format and was sourced from the websites, by copying from the websites and pasting into excel.  It was difficult to find certain years of data, and school websites where searched for these years.
+
+## Pre-processing Steps
+
+The provided forecast demand data came in 2 parts, i.e. Part a and b, in the zip file forecastdemand_nsw.csv.zip.  These files needed to be unzipped and then concatenated into a single file.
+
+The data type on the columns which contain the date time are not date time, therefore the column have been cast to datetime for better analysis.  
+
+A binary column is utilised to indicate if the particular day is a public holiday or not.
+
+## Data Cleansing
+
+### Energy Demand
+The energy data contained the following columns,i.e. Datetime, RegionId, and TotalDemand. Only Datetime and TotalDemand data was utilised.  We did ensure all the data in the dataset related to NSW, i.e. checking the distinct regionId, which was found to be "NSW1"
+
+### Temperature 
+Whilst looking at the minimum and maximum temperatures in the dataset, the minimum was -9999 which is an invalid temperatures.  These rows were investigated and removed.  Analysis of the data which where greater than -9999 but under 0 degrees celcius where kept since these where valid temperatures.
+The dataset has a Location column, and checking this column there is only one value of 94766, which relates to the weather station from where the temperature was recorded.  The Location column was excluded from analysis, since it did not add value.
+
+### Population
+The source data for population has records from the year 1981.  For this report, data from the year 2010 was utilised since the demand and temperature data only starts from the year 2010.  The population data is in 3 month intervals, therefore data from 1-Mar-2010 is utilised when merging the demand with population data.
+
+### Public Holidays
+Since the public holiday data were manually captured from different sources, the data files had different formats.  Therefore each year was analyses and cleaned before being merged into one file which contained the date and the name of the public holiday. 
+In this merged dataset, duplicates where found on the date field, since some dates had 2 different names, or 2 holidays where over-lapping each other, e.g. Easter Monday and Anzac Day, and New Years day had different descriptions.  One row was kept for these kind of duplicates.  The Name of the holiday was kept to ensure when merging the data to the energy demand, temperature, rrp dataset it could be used to decide to set the IsHoliday column to 1, i.e. a left join was utilised, with the holiday dataset being on the left.
+
+### Energy Price
+Only settlement date and RRP was utilised from the RRP source.  The RRP column consisted of values of -1000 which at first glance didn't look valid.  Reading through the source website there is RRP where it can be negative.  An assumption has been made,i.e. -1000 is valid. 
+
+```{python data-cleansing, include = FALSE}
+## check values which are less than 0 HIDE THIS ENTIRE OUTPUT
+temp_Less0 = temp_df[temp_df['TEMPERATURE'] < 0]
+temp_Less0.describe()
+
+## only leave rows where temp > -9999 which will exclude data which is -9999
+temp_df= temp_df[temp_df['TEMPERATURE'] > -9999]
+temp_df.describe()
+
+# Check for duplicate DATETIME, keep = False to see all the duplicates
+duplicate_rows = total_demand_df[total_demand_df.duplicated(keep = False)]
+
+# Identify missing values
+missing_values_count = total_demand_df['TOTALDEMAND'].isna().sum()
+
+# Drop missing values or use any method you prefer to handle missing values
+total_demand_df = total_demand_df.dropna()
+
+# drop duplicated rows
+total_demand_df = total_demand_df.drop_duplicates()
+```
+
+## Assumptions
+
+
+The ‘temperature’ in temperature dataset is given for Bankstown suburb in Sydney. In this analysis this temperature is assumed to be applied to the entire New Sout Wales state.
+
+## Modelling Methods
+
+To forecast the energy demand of NSW regression method are applied by using several machine learning algorithms including Linear Regression, Multi-Layer Perceptron, Random Forest, XGBoost and Facebook Prophet. XGBoost is the main model in this analysis. 
+
+### Linear Regression 
+
+In Linear Regression modelling, statistical method is used to establish a linear relationship between dependent and independent variables. It finds a best-fitting line, a linear equation, that minimizes the difference between observed and the predicted value by the model. In forecasting this learned relationship is used to predict future value of dependent variable.
+
+### Multi-Layer Perceptron (MLP) 
+
+In Artificial Neural Network MLP is a feed forward neural network consisting of three layers input, hidden and output layer. During the training it takes features as input and to map the features to the target values, it adjusts weights and biases between neurons by using gradient descent technique that minimizes the loss function i.e., the difference between observed and predicted value. A trained MLP on historical data can then be used on unseen data to predict the future value. 
+ 
+### Random Forest (RF) 
+
+It is an ensemble leaning technique that grows multiple decision trees and combinedly makes prediction. To build several decision treess it randomly selects observations and features from the input. For regression tasks, it averages the output from each individual decision trees and then gives the final prediction 
+ 
+### Facebook Prophet 
+
+Prophet is another forecasting procedure for time series data used in this project just to compare if the main model performs better. It is an open-source library published by Facebook. It is based on additive model where non-linear trends are fit with yearly, monthly, plus holiday effects (Prophet, 2023). If there is strong seasonal effect in the time series data, then with a few historical seasonal data it can perform better. It deals with outliers very well and robust to the missing data (@github-facebook). 
+ 
+### Main Model  
+
+Extreme Gradient Boosting (XGBoost) was chosen as a main model in this project. XGBoost is a fantastic decision tree machine learning library developed by Tianqi Chen. It is an implementation of the stochastic gradient boosting machine learning algorithm. The gradient boosting or tree boosting algorithm uses ensemble of weak models, such as decision trees, to make predictions. Gradient boosting implementations are slow due to its sequential nature where each tree must be constructed and added to the model. XGBoost regularizes gradient boosting. The principle focus of XGBoost is to speed up and improve the performance of gradient boosted decision trees by providing scalable, portable, and distributed gradient boosting.  
+
+
+## Measures of forecast accuracy
+
+To measure the accuracy, we take the difference between actual and the predicted value by the model, which is also known as forecast error. The lesser the forecast error the more accurate the model. There are several accuracy measures. Depending on the problem's nature and the model's implications, selected accuracy measures are chosen. In this analysis the following accuracy measures are considered: 
+
+### Mean Squared Error (MSE) 
+
+MSE is the average of the squared difference between the target and the predicted value by the regression model. MSE is calculated by the following formula:
+
+$$
+MSE = \frac{1}{n} \sum_{i=1}^{n} (y_{i} - \hat{y}_{i})^2
+$$
+Since it squares the differences, it penalizes even a small error. The intuition of squaring the error is to make the large errors appear big. It is easy to calculate but sensitive to outliers. 
+
+### Mean Absolute Error (MAE) 
+
+It is one of the simplest accuracy measures, the mean of absolute difference between target and the value predicted by the model. 
+
+$$
+MAE = \frac{1}{n} \sum_{i=1}^{n} |y_{i} - \hat{y}_{i}|	
+$$
+
+MAE is more robust to the outliers as it takes only the absolute value of the error. MAE does not penalize the error as extreme as MSE. So, when there are outliers in the data, MAE is preferable to use. 
+
+### Root Mean Squared Error (RMSE) 
+
+It is simply the square root of the mean of squared errors and calculated as: 
+
+$$
+RMSE = \sqrt{ MSE } = \sqrt {\frac{1}{n} \sum_{i=1}^{n} (y_{i} - \hat{y}_{i})^2}	
+$$
+
+RMSE is used to compare forecasting errors of different models for a particular dataset and not between the datasets (@wikipedia-rms). RMSE is always non-negative and a zero indicates a perfect fit. The lesser the RMSE the better the model fits the data. This accuracy measure is sensitive to outliers. 
+
+### Mean Absolute Percentage Error (MAPE) 
+
+MAPE is a measure of prediction accuracy in a forecasting model (@wikipedia-mape). MAPE is calculated by the following formula:
+
+$$
+MAPE = 100 \times \frac{1}{n} \sum_{i=1}^{n} \left| \frac{\mathit{actual \, value} - \mathit{forecast \, value}}{\mathit{actual \, value}} \right|
+$$
+
+MAPE makes comparison of forecasting methods easier (and more useful) because working with percentage “standardizes” the errors. The time series’ original units no longer matter. MAPE is affected by outliers.
+
+
+
+# Exploratory Data Analysis {#s-data-analysis}
+
+In energy demand forecasting there are several factors that can impact on demand and hence the forecasting. In this analysis for demand forecasting we consider several factors as features such as temperature, seasons, price of energy, holiday and several time series factors which could potentially impact energy demand. We tried to discover and investigate target and features relationship in this part of analysis.
+
+```{python merge-demand-temp, include = FALSE}
+# Merge demand and temperature data sets HIDE THIS ENTIRE OUTPUT
+merged_df = pd.merge(total_demand_df, temp_df, on = 'DATETIME', how = 'inner')
+
+merged_df.head(5)
+
+merged_df.info()
+merged_df.describe()
+```
+
+
+```{python demand-temp-time-series, echo = FALSE}
+demand_temp_df = pd.read_csv('../../data/demand_temp.csv')
+# convert 'DATETIME' to a datetime object HIDE THIS ENTIRE OUTPUT
+demand_temp_df['DATETIME'] = pd.to_datetime(demand_temp_df['DATETIME'])
+# Set index
+demand_temp_copy = demand_temp_df.copy()
+demand_temp_idx = demand_temp_copy.set_index('DATETIME')
+
+#{ python function-createfeature}
+# Create time series features based on time series index
+def create_features(df):
+    df['YEAR'] = df.index.year
+    df['MONTH'] = df.index.month
+    df['DAY_OF_WEEK'] = df.index.dayofweek
+    df['DAY'] = df.index.day
+    df['HOUR'] = df.index.hour
+    df['HALF_HOUR'] = df.index.minute//30
+    
+    return df
+
+# {python create-timeseries}
+# Create timeseries features
+demand_temp_features = demand_temp_idx.copy()
+demand_temp_features = create_features(demand_temp_features)
+  
+```
+
+## Energy Demand Distribution
+
+Figure \ref{fig:plot-density-curve-energy-demand} shows the density curve for the distribution of NSW energy demand. 
+
+```{python plot-density-curve-energy-demand, echo = FALSE, out.width = "100%", fig.cap = "Total Demand Distribution"}
+
+# Density curve of total energy demand
+plt.figure(figsize=(8, 4))
+sns.distplot(demand_temp_df['TOTALDEMAND'], kde=True, color='green')
+plt.xlabel("TOTALDEMAND (MW)")
+plt.title("Total Demand Distribution")
+plt.grid()
+plt.show()
+
+```
+
+The distribution of energy demand is not symmetric, since an extended right tail is plotted, which exceeds 14500 MW of demand. This indicates there are occasional or a rare event when demand is significantly higher than the average demand. This density curve implies the energy provider and grid operators would need to be prepared for such rare high demand periods. To maintain a stable supply of energy the energy providers may need to have additional capacity in place.
+
+## Temperature Distribution
+
+Figure \ref{fig:plot-temp-distribution} shows the density curve for the distribution of NSW Temperature. 
+
+```{python plot-temp-distribution, echo = FALSE, out.width = "100%", fig.cap = "Temperature Distribution"}
+# Density curve of total energy demand
+plt.figure(figsize=(8, 4))
+sns.distplot(demand_temp_df['TEMPERATURE'], kde=True, color='green')
+plt.xlabel("TEMPERATURE (°C)")
+plt.title("NSW Temperature Distribution")
+plt.grid()
+plt.show()
+```
+
+The distribution of temperature is not symmetric, and it is right skewed. The long tail to the right suggests majority of the data points (lower temperatures) are less than the mean temperature of 17.40°C, i.e. concentrated to the left and few number of data points (higher temperatures) are extending out to the right.
+
+## Relationship Between Energy Demand and Temperature
+
+The variables which relate to weather, i.e. temperature, rainfall, solar exposure, wind speed and humidity may have a significant impact on energy demand. The inter-dependency between weather variables are complex, but temperature is the key influential climatic variable because it controls the atmospheric conditions.  Therefore temperature has the most important impact on energy demand (@vu-et-al-2014-climate-variables-energy-demand).
+
+Graphs of observed energy demand and temperature are plotted and also a Pearson correlation coefficient is measured to see if there is any linear relationship between temperature and energy demand.
+
+```{python plot-energy-demand-temperature-by-year, echo = FALSE, out.width = "100%", fig.cap = "Energy Demand vs Temperature"}
+# Plot energy demand and temperature against year
+demand_temp_idx[['TOTALDEMAND', 'TEMPERATURE']].plot(subplots=True, 
+  title='Energy Demand vs Temperature')
+plt.show()  
+
+# calculate pearson correlation coefficient between energy demand and temperature
+demand_temp_cor = demand_temp_df[['TEMPERATURE','TOTALDEMAND']].corr()
+print("Correlation coefficient:\n", demand_temp_cor) # 0.114347
+
+```
+
+Comparing the energy demand and temperature in Figure \ref{fig:plot-energy-demand-temperature-by-year}, it is observed that as temperature increases or decreases, the demand in energy consumption is increasing. The correlation coefficient between them is 0.114 which suggests a very weak linear relationship. But it is evident that temperature greatly affects demand, but the relationship is non-linear. A scatter plot confirms the non-linear relationship.
+
+```{r plot-energy-demand-temperature-by-years, echo = FALSE, out.width = "100%", fig.cap = "Energy Demand and Temperature Scatter Plot"}
+
+knitr::include_graphics("images/demand_dependency_on_temp.png", dpi = NA)
+
+```
+
+
+The demand dependency on temperature in Figure \ref{fig:plot-energy-demand-temperature-by-years} clearly exhibits a curve which indicates a non-linear relationship between demand and temperature.
+
+## Components of time series: Seasonality and Trend
+
+Seasonality is a variation that occurs at specific regular intervals of less than a year (e.g. daily, weekly, monthly, or annually) and trend is the presence of a long term increase or decrease in the sequence of data (@identify-trend-and-seasonality, @nsw-epa-status-trend). In this part of analyis given the datetime we tried to identify if there is a presence of seasonality, treand and stationarity in the NSW historical energy demand and temperature data. 
+
+Figure \ref{fig:plot-energy-demand-yearly-trend} shows the components of time series. 
+
+```{python plot-energy-demand-yearly-trend, include = TRUE, echo = FALSE, out.width = "100%", fig.cap = "Energy Demand Yearly Trend"}
+ANNUAL_PERIOD = 365 * 24
+mult_decomp = seasonal_decompose(demand_temp_idx['TOTALDEMAND'], 
+  model = 'multiplicative', 
+  extrapolate_trend = 'freq', 
+  period = ANNUAL_PERIOD)
+
+# Plot only the trend component
+plt.figure(figsize = (10, 4))
+plt.title('Trend Component')
+plt.plot(mult_decomp.trend, color = 'green')
+plt.grid()
+plt.xlabel('Time')
+plt.ylabel('Demand (MW)')
+plt.show()
+```
+
+
+From the trend component in Figure \ref{fig:plot-energy-demand-yearly-trend}, the demand for energy follows a downward trend since year 2010 which supports the data, i.e. the energy consumption in NSW has decreased by 2% over the past 10 years (@nsw-of-environment-2022). Each year, there are regular spikes and dips in demand which indicate the presence of seasonality. For further investigation, the data is split into monthly and daily demand and can be represented in graphs.
+
+### Seasonality by month
+
+```{python plot-energy-demand-temperature-monthly, include = TRUE, echo = FALSE, out.width = "100%", fig.cap = "Temperature And Energy Demand By Month"}
+# Get month names; for renaming the xticklabels
+months = list(months)[1:]
+
+# Plot monthly energy demand
+fig, ax = plt.subplots(figsize = (8, 3))
+sns.boxplot(data=demand_temp_features, x = 'MONTH', y = 'TOTALDEMAND')
+ax.set(xlabel='', ylabel='Total Demand (MW)', xticklabels=months) # xlabel='Month'
+ax.set_title('MW by Month')
+
+# Plot monthly temperature
+fig, ax = plt.subplots(figsize=(8, 3))
+sns.boxplot(data=demand_temp_features, x = 'MONTH', y = 'TEMPERATURE')
+ax.set(xlabel='', ylabel='Temperature (°C)', xticklabels=months) # xlabel='Month'
+ax.set_title('Temperature by Month')
+
+plt.show()
+```
+
+
+In Australia, June, July and August are the coldest months during winter. Summer has three hottest months, i.e. December, January and February. Spring has three transition months September, October and November, and Autumn lasts for three months, i.e. March, April and May. The monthly energy demand in Figure \ref{plot-energy-demand-temperature-monthly} shows that during Summer and Winter the energy demand reaches its peak as people's usage of air-conditioning in summer and heating system in winter increases. It  can be seen, during Spring and Autumn, the energy demand is lower, since the temperature remains at an average temperature and the need for heating or cooling homes decreases.
+
+ 
+ Year on year seasonal trend for the past twelve years from the year 2010 displays a repetitive seasonal trend in consumption of energy. This implies a consistent and strong seasonal pattern in energy demand with higher demand in winter and summer.
+
+
+In Figure \ref{fig:year_to_year_seasonality_trend}, the seasonality trend is depicted across successive years.
+
+
+```{r year_to_year_seasonality_trend, echo = FALSE, out.width = "100%", fig.cap = "Year On Year Seasonality Trend"}
+
+knitr::include_graphics("images/year_to_year_seasonality_trend.png", dpi = NA)
+
+```
+
+### Average Monthly Demand
+
+
+In Figure \ref{fig:year_to_year_seasonality_trend}, the distribution of average monthly demand across the entire dataset is illustrated. The figure reveals a distinct trend in monthly variations, providing valuable insights into the cyclical nature of the demand.
+
+```{r average-monthly-demand, echo = FALSE, out.width = "100%", fig.cap = "Average Monthly Demand"}
+
+knitr::include_graphics("images/average_monthly_demand.png", dpi = NA)
+
+```
+
+
+### Seasonality by hour of the day
+
+The amount of energy being used is affected by many factors, but mostly by temperature and time of the day.
+
+```{python plot-demand-temperature-by-hour, echo = FALSE, out.width = "100%", fig.cap = "Temperature and Energy Demand by Hour"}
+# Plot hourly energy demand
+fig, ax = plt.subplots(figsize=(8, 3))
+sns.boxplot(data = demand_temp_features, x = 'HOUR', y = 'TOTALDEMAND')
+ax.set(ylabel = 'Total Demand (MW)')
+ax.set_title('MW by Hour')
+
+# Plot hourly temperature
+fig, ax = plt.subplots(figsize=(8, 3))
+sns.boxplot(data = demand_temp_features, x = 'HOUR', y = 'TEMPERATURE')
+ax.set(ylabel = 'Temperature (°C)')
+ax.set_title('Temperature by Hour')
+
+plt.show()
+```
+
+
+From Figure \ref{fig:plot-demand-temperature-by-hour}, on an average day, it is observed the energy demand gradually increases through the daytime as temperature outside increases. The demand picks at around 6pm as people start getting home and use appliances when home. As the sun and temperature decreases, demand starts dropping off and reaches to its low between 2 and 3am in the morning because air-conditioning or heating equipment are not being utilised.
+
+## Relationship Between NSW Population Growth and Energy Demand
+
+We assume that population has effect on energy demand, therefore, if population increases, energy demand will increase too. To test this assumption, we fit the regression line of energy demand against estimated resident population.
+
+```{python plot-demand-vs-population, echo = FALSE, out.width = "100%", fig.cap = "Correlation Between Population Growth and Total Energy Demand"} 
+demand_pop = pd.read_csv('../../data/demand_population.csv')
+
+# Set the figure size
+plt.figure(figsize=(8, 5))  # Making the plot wider and taller
+
+# Create a scatter plot with regression line
+sns.regplot(x = 'Estimated Resident Population', 
+            y = 'TOTALDEMAND', 
+            data = demand_pop,
+            # Setting scatter plot color to purple
+            scatter_kws = {'color': 'purple'},
+            # Setting line color to green
+            line_kws = {'color': 'green'})
+
+# Add labels and title
+plt.xlabel('NSW Estimated Resident Population (in million)')
+plt.ylabel('Total energy Demand (MW)')
+plt.title('Correlation Between Population Growth and Total Energy Demand')
+
+# Show the plot
+plt.show()
+
+  
+```
+
+As observed in Figure \ref{fig:plot-demand-vs-population}, the fitted regression line of energy demand has a downward trend, demand decreases as the population grows which also implies negative correlation. The calculated correlation is -0.53. For several reasons energy demand and population growth can exhibit negative correlation. Improved energy efficient technology and infrastructure, advanced appliances and industrial processes can significantly reduce the energy demand even if the population grows. Shifts to new energy sources- shifts from fossil fuel to more cleaner and efficient energy sources such as renewable energy can significantly reduce the energy demand.
+
+## Relationship Between Energy Demand and Energy Price
+
+To investigate the relationship between energy demand and its price we fit a regression line of energy demand against energy price.
+
+```{python plot-energy-demand-price, echo = FALSE, out.width = "100%", fig.cap = "Correlation Between Total Energy Demand and Energy Price"}
+# Read the data into dataframe
+final_df = pd.read_csv('../../data/merged_TempDemandRRPHoliday.csv')
+final_df['DATETIME'] = pd.to_datetime(final_df['DATETIME'])
+
+# sort datetime in ascending orders
+final_df = final_df.sort_values(by=['DATETIME']) #, inplace=True)
+
+# drop the rows that has RRP -1000 0r above
+final_df= final_df[final_df['RRP'] > -1000]
+# Set the figure size
+
+```
+
+```{r correlation-between-total-energy-demand-and-energy-price, echo = FALSE, out.width = "100%", fig.cap = "Correlation Between Total Energy Demand and Energy Price"}
+
+knitr::include_graphics("images/correlation_between_total_energy_demand_and_energy_price.png", dpi = NA)
+
+```
+
+
+
+The fitted regression line of energy demand in Figure \ref{fig:correlation-between-total-energy-demand-and-energy-price} follows an uptrend which also implies positive correlation between energy demand and its price. The calculated correlation coefficient is 0.1345 implies a weak positive correlation. There are several reasons for which energy demand could increase even though price increases. For example, limited alternative to reduce the energy consumption in short term period, Seasonal and Weather effect, regardless of the price people are to consume more energy during winter and summer, income and economic growth leads to higher consumption of energy even if the price increases.
+
+## Relationship Between Energy Demand and Holiday
+
+Most often people are away from home while on holidays which results in less consumption of energy. It is observed in Figure \ref{fig:plot-energy-demand-holiday}, energy demand tends to go higher when no holiday.
+
+```{python plot-energy-demand-holiday, echo = FALSE, out.width = "100%", fig.cap = "Energy Demand on Holiday"}
+# convert Holiday column into string for plotting purpose  
+final_df['isHoliday'] = final_df['isHoliday'].astype(str)
+
+fig, ax = plt.subplots(figsize=(6, 4))
+sns.scatterplot(data=final_df, x="isHoliday", y="TOTALDEMAND")
+
+ax.set(xlabel='Holiday', ylabel='Energy Demand (MW)', xticklabels=['Yes', 'No'])
+ax.set_title('Energy Demand on Holiday')
+plt.show()
+```
+
+
+# Analysis and Results {#s-analysis-results}
+
+For the comparison of our model performance, we establish a benchmark using the given demand forecast data and actual demand data. We consider 30 minutes frequency over the periods of 48 that gives a 24-hour forecasting. The demand forecasting found to be highly accurate. Here below the MAPE, MAE and RMSE scores are given.
+
+|       MAPE    |  MAE        |  RMSE       |
+| ------------: | ----------: | ----------: |
+|   2.469\%     | 204.027     | 280.450     |
+		
+
+Table: Benchmark Evaluation Matrices
+
+## Results from Initial Models
+
+To forecast the energy demand, we initially consider three models: Linear Regression, Multi-layer Perceptron and Random Forest.
+
+In the first experiment, target variable is energy demand and inputs are the temperature and time series features. The performances of different models are shown below:
+
+| Model                 | Data  | MAPE     | MAE      | RMSE     |
+|-----------------------| ----  | -------: | -------: | -------: |
+| Linear Regression     | train | 10.606\% | 855.533  | 1080.704 |
+|                       | test  | 11.422\% | 883.416  | 1146.064 |
+| --------------------- | ----- | -------- | -------- | -------- |
+| MLP                   | train | 10.899\% | 887.541  | 1117.268 |
+|                       | test  | 13.721\% | 1007.229 | 1222.413 |
+| --------------------- | ----- | -------- | -------- | -------- |
+| Random Forest         | train | 6.987\%  | 573.809  | 763.936  |
+|                       | test  | 11.321\% | 833.064  | 1083.929 |
+
+Table: \label{tab:eval-matrix-temp-time} Evaluation Matrices - with Temperature and Time Series as Inputs
+
+From Table \ref{tab:eval-matrix-temp-time}, it is seen that Linear Regression model, with an MAPE error rate of 11.42% and RMSE of 1146.06 on test data performs better than Multi-Layer Perceptron. But Random Forest model outperforms both with an MAPE and RMSE score of 11.32% and 1083.93, respectively.
+
+
+With Linear regression there is an assumption a linear relationship exists between the features and target variables.  When plotting the Energy Demand against Temperature, it was found there was a non-linear relationship.  Monthly, daily, weekly seasonality also exhibits non-linear relationship with energy demand. Since the relationship is non-linear, the linear model does not perform well with the complexity of the data.
+
+Here Random Forest performed better than Linear Regression because: 
+
+- data are not normally distributed
+-	too many outliers in the data
+-	Target-Features relationship are non-linear
+-	Linear Regression struggle with complex feature interactions
+
+Here Random Forest (RF) performs better than Multi-Layer Perceptron because:
+
+-	RF deals with outliers very well in the data
+-	less tuning for random forest
+-	MLP struggle with complex feature interactions
+-	Data are in a tabular format.
+
+From the figure below, Figure \ref{fig:actual-demand-vs-random-forest-prediction}, we can see that the performance of Random Forest prediction is average. It mostly fails to predict the demand when the demand is high or low, therefore, seasonality was not captured.
+
+```{r actual-demand-vs-random-forest-prediction, echo = FALSE, out.width = "100%", fig.cap = "Actual Demand vs Random Forest Prediction"}
+#{r actual-demand-vs-random-forest-prediction, fig.align = 'center', out.width = "100%", fig.cap = "Demand Forecast one year"}
+
+#knitr::include_graphics(here::here("images", "demand_forecast_1_year.png"))
+knitr::include_graphics("images/Actual_Demand_vs_Random_Forest_Prediction.png", dpi = NA)
+
+```
+
+## Facebook Prophet
+
+As a comparison, Facebook Prophet is also considered. In the first model, to forecast energy demand, temperature, energy price, holiday and time series features are used as regressors. This model produces a Mean Absolute Percentage Error (MAPE) of 16.53. Again, a simple second model is built without any regressor. It is found out that the second model with a forecasting error rate of 9.79 (MAPE) outperforms the first model.
+
+
+| Facebook Prophet | MAPE     | MAE      | RMSE     |
+| :--------------- | -------: | -------: | -------: |
+| Model-1          | 16.527   | 1233.650 | 1520.480 |
+| Model-2          | 9.790    | 740.502  | 919.021  |
+
+Table: Forecasting error on test data set
+
+```{r actual-demand-vs-prophet-prediction, echo = FALSE, out.width = "100%", fig.cap = "Actual Demand vs Prophet Prediction"}
+
+knitr::include_graphics("images/Actual_Demand_vs_Prophet_Prediction.png", dpi = NA)
+
+```
+
+
+## XGBoost
+
+In this final experiment, to forecast the energy demand by using XGBoost, we include three more factors, price of energy, holiday and one year lag as input. The reason for inclusions of one year of lag is that we are also doing a one-year demand forecasting for the period of Aug 2022 to July 2023. 
+
+In our project, we adopt a 5-fold Time Series Split for cross-validation. TimeSeriesSplit is particularly suited for time series data, as it maintains the temporal order of observations. Unlike standard k-fold cross-validation, Time Series Split ensures that each training set is a superset of the one that precedes it. This aligns well with our dataset, where autocorrelation is a key characteristic.
+
+Fold 0: The first fold shows the smallest training set, in alignment with TimeSeriesSplit's approach of adding surplus data to the initial training partition.
+
+Fold 1 to 4: Each subsequent fold illustrates that the training set incorporates data from the preceding training sets and adds new data to it, while the test set moves forward in time.
+
+By visualizing these 5 folds, we can observe how each fold trains on an increasingly larger set of past data to predict a future test set. This enables a more realistic evaluation of our model’s performance on future, unseen data.
+
+```{r five-fold-img, echo = FALSE, out.width = "100%", fig.cap = "Five Folds Time Series Split"}
+
+knitr::include_graphics("images/5folds TimeSeriesSplit.png", dpi = NA)
+
+```
+
+By taking the lag we are using historical demand data from one year ago and this would help us to capture the trend and pattern from the demand data which may persist into the future. The performances matrices are given below: 
+
+| Model                   | Data  | MAPE   | MAE      | RMSE     |
+|-------------------------|-------|-------:|---------:|---------:|
+| XGBoost       	  | train | 5.87\% | 482.473  | 646.421  |
+|                         | test  | 7.03\% | 542.745  | 714.744  |
+
+
+Table: Evaluation matrices- temperature, price, holiday and timeseries features are factors
+
+As compared to our initial models in the first experiment, XGBoost performed a lot better. It achieved a MAPE value of 7% and RMSE score of 714 on test dataset where for Random Forest they were 11% and 1083, respectively. The performance scores between training and test datasets are not significantly different which indicates that this model has overcome the overfitting issue. XGBoost forecasting will be more reliable. 
+
+From the Figure: Actual demand and XGBoost Prediction, we see that it failed to predict some of the extreme demand such as demand which was over 1100MW and below 6000MW. But overall, it captured the most variation in the energy demand. 
+
+Figure: Actual_Demand_vs_XGBoost_Prediction
+
+### Future Forecast for one year
+For next one year forecast we consider the period from Aug 2022 to July 2023. As we did not have future data, we considered the model performances on the training dataset. Our XGBoost model achieved an MAPE value of 5.76% and RMSE score of 629. 
+
+From the figure below, we can see that model was quite good, capturing the seasonal trend. 
+
+```{r Future-Forecast-One-Year, echo = FALSE, out.width = "100%", fig.cap = "Future Forecast For One Year"}
+
+knitr::include_graphics("images/Future_Forecast_One_Year.png", dpi = NA)
+
+```
+
+
+# Discussion {#s-discussion}
+
+Although the Random Forest algorithm does significantly better than both the Linear Regression and MLP models, it's worth noting that its forecast error rate of 11.32% still falls short when compared to the benchmark error rate of 2.47%. In a similar vein, Facebook Prophet performs notably better than Random Forest, achieving a MAPE (Mean Absolute Percentage Error) value of 9.8% and an RMSE (Root Mean Square Error) score of 740. However, even this model's error rate isn't as good as the benchmark rate of 2.47%.
+
+As we looked for ways to improve upon these results, we considered trying out another popular ensemble method known as XGBoost. Much like Random Forest, XGBoost is grounded in decision tree algorithms and is particularly good at capturing complex relationships and nuanced patterns within the dataset. After undergoing several rounds of hyperparameter tuning, after some trial and error, our XGBoost model impressively reached a MAPE value of just 7% and an RMSE score of 715. These metrics were the best we could get among all the models we had considered, leading us to adopt this XGBoost model as our final choice for forecasting energy demand over the next year.
+
+
+
+```{r Feature-Importance, echo = FALSE, out.width = "100%", fig.cap = "Feature Importance"}
+
+knitr::include_graphics("images/Feature_Importance.png", dpi = NA)
+
+```
+
+
+
+In terms of feature importance, Figure \ref{fig:Feature-Importance} in our report illustrates the most impactful variables according to our final XGBoost model. Interestingly, the one-year lag and hourly lag variables emerged as the two most influential factors. They were closely followed by temperature, the price of energy, and the occurrence of public holidays. These results serve to confirm one of the key hypotheses of our project: namely, that variables such as temperature, energy pricing, and public holidays have a meaningful impact on energy demand. Therefore, these variables are worth considering in any future energy demand forecasting efforts.  
+
+
+
+# Conclusion and Further Issues {#s-conclusion}
+
+This paper has shown the impact of population, air temperature, seasons, price of energy, holidays and several time series factors which  impact the energy demand.  Population has a negative correlation with the energy demand, whilst the other features have a positive impact on the energy demand.  Focusing on the top three features of highest importance, i.e. lag1, hour of the day, and temperature in the XGSBoost model, means the previous years data, the hour of day and temperature had the most importance when predicting energy demand for the next year.  
+
+
+Recognizing the inverse relationship between population growth and energy demand observed in this study provides a valuable insight. The government of New South Wales should focus on sustainable practices and energy-efficient technologies to further reduce the environmental impact associated with the increasing population densities, as highlighted "Population density in NSW has also risen. In June 2020, there were an average of 10.2 people per square kilometre – a 7.4% rise since 2015. Across Greater Sydney, the average density reached almost 480 people per square kilometre – 41 more than in 2015." (@nsw-population).  
+
+There are initiatives which have been implemented by the NSW government which  
+
+It is important to note, its crucial to emphasize the need for future policies and strategies with the fact 
+NSW government will need to manage the expectation of the energy suppliers, i.e. to keep the suppliers contributing to the energy grid with a promise of continued business prospects.  The NSW government can take in consideration the effects of global warming, "Climate change is projected to increase temperatures in Sydney with maximum temperatures projected to increase by 0.7°C by 2030" (@nsw-climate-change-fact-sheet) and with these increases in air temperature this would increase the energy demand. 
+
+Focusing on the time of day feature the peak energy demand happens around 6pm, which is approximately when the sun sets, therefore solar energy use can not be utilised to its maximum during peak demand periods.  The NSW Government can direct funding to Solar battery providers and home owners to encourage the installation and use of batteries for those high peak demand times.  It has been found "By storing surplus energy during the day for use at night, batteries can help you avoid using energy from the grid at peak times. With a battery you can coast through the expensive times using battery-stored solar energy that you harvested during the day." (@battery-storage-systems).  With this shift of power generation and use, the current business for those energy suppliers could move into the supply of batteries, and other alternate initiatives of energy to the market and to keep businesses in the market and profitable.
+
+When focusing on the model, and improving the forecast model, more historical data would be beneficial to improve the forecast model.  Other suggestions would be to include other features into the model which would contribute to the decrease of energy, and factors leading to the decrease in demand and ensure the NSW Government has a sustainable energy supply and demand for the population of NSW.
+
+
+
+# References {-}
+
+<div id="refs"></div>
+
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+# Appendix {-}
+
+## Sourcing Public holidays 
+
+We did not take in consideration the local holidays since it changes depending on the council, and the current demand and temp data sets do not have local council data.
+
+### Source of data 
+
+- [2011: Nager.Date - Public Holidays in Australia 2011](https://date.nager.at/PublicHoliday/Australia/2011)
+- [2012: Nager.Date - Public Holidays in Australia 2012](https://date.nager.at/PublicHoliday/Australia/2012)
+- [2013-2015: NSW Public Holidays 2013-2015](https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/nsw-public-holidays-2013-2015/)
+- [2019-2020: NSW Public Holidays 2019-2020](https://www.industrialrelations.nsw.gov.au/public-holidays/public-holidays-in-nsw/nsw-public-holidays-2019-2020/)
+- [2014-2024: Australian Public Holidays Dates Machine Readable Dataset](https://data.gov.au/data/dataset/australian-holidays-machine-readable-dataset)
+
+
+## Git Repository
+
+- [Scripts for merging data, exploratory, and models](https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/blob/main/src/README.md)
+- [All source data files, and merged data files](https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/tree/main/data)
+- [Report files](https://github.com/van-hai-ho/ZZSC9020_Project_Group_K/tree/main/report/Group_Report)
+
+
+
